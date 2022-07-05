@@ -1,0 +1,35 @@
+# intellij project files.
+*.iml
+
+# Requirements constraints file and pin file are excluded.
+constraints.in
+requirements.txt
+
+# Ignore vim swap files.
+.*.swp
+
+.ipynb_checkpoints
+
+logs/
+
+# `pytest --testmon` database.
+.testmondata
+
+.pytest_cache
+
+/.mypy_cache
+
+# pyre database
+/.pyre
+
+# Ignore the IntelliJ directory.
+/.idea
+
+# Ignore python virtual enviornment.
+/venv
+# Ignore python cache directories.
+__pycache__
+
+# Ignore the build directory.
+/build
+

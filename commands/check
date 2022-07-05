@@ -1,0 +1,20 @@
+#!/bin/bash
+
+set -e
+
+cd $WORKSPACE_ROOT_DIR
+
+source venv/bin/activate
+
+if (( $# )) ; then
+  TARGETS=( $@ )
+else
+  TARGETS=( tapestry )
+fi
+
+echo "Code Quality Scans ..."
+
+mypy --incremental "${TARGETS[@]}"
+
+# does not like pytorch
+# pyre incremental

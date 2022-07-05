@@ -1,0 +1,56 @@
+# The requirements file is bound by a .gitignored local 'constraints.in' file.
+# If you need to specify a special version of pytorch, that is the location
+# to add the links to.
+-c constraints.in
+
+# Python
+pip-tools
+nbqa  # run python code tests on .ipynb
+autoflake
+black
+black[d]
+black_nbconvert  # for formatting .ipynb
+isort
+
+# Python Strict
+overrides
+
+# ipython
+ipython
+jedi
+parso
+# Note, there was a bug in ipython <tab> completion.
+# See: https://github.com/ipython/ipython/issues/12745
+# jedi==0.17.2
+# parso==0.7.1
+
+# python typing
+mypy
+
+# Testing
+pytest
+pytest-custom-exit-code  # --suppress-no-test-exit-code
+PyHamcrest
+testfixtures
+
+# numpy
+numpy
+nptyping
+scipy
+
+# Pandas
+pandas-stubs
+
+# pytorch
+# pytorch with cu111 builds.
+torch
+
+# jupyter
+jupyter
+
+# graphviz stuff
+graphviz
+pydot
+
+# graphing
+matplotlib
