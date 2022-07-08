@@ -4,6 +4,7 @@ import numpy as np
 import torch
 
 from tapestry import space
+from tapestry.space_testlib import match_zpoint
 from tapestry.testlib import eggs, np_eggs, torch_eggs
 
 
@@ -98,14 +99,14 @@ class ZRangeTest(unittest.TestCase):
             end=(2, 4),
         )
 
-        torch_eggs.assert_tensor_equals(
+        eggs.assert_match(
             ib.start(),
-            (2, 3),
+            match_zpoint((2, 3)),
         )
 
-        torch_eggs.assert_tensor_equals(
+        eggs.assert_match(
             ib.end(),
-            (2, 4),
+            match_zpoint((2, 4)),
         )
 
         torch_eggs.assert_tensor_equals(

@@ -4,34 +4,6 @@ import numpy
 import torch
 
 
-def expect_zpoint(
-    a: torch.Tensor,
-    name: str = "value",
-):
-    if not (
-        isinstance(a, torch.Tensor)
-        and a.ndim == 1
-        and len(a) >= 1
-        and a.dtype == torch.int64
-    ):
-        raise AssertionError(f"Expected ZPoint, found {name}:{a}")
-
-
-def expect_zpoint_lt_zpoint(
-    a: torch.Tensor,
-    b: torch.Tensor,
-    value_name: str = "a",
-    expected_name: str = "b",
-):
-    expect_zpoint(a, value_name)
-    expect_zpoint(b, expected_name)
-
-    if (a.shape != b.shape) or not (a <= b).all():
-        raise AssertionError(
-            f"Expected {value_name}:{a} to be strictly <= {expected_name}:{b}"
-        )
-
-
 class ZPoint:
     """
     Immutable point in ℤN coordinate space.
@@ -77,6 +49,9 @@ class ZPoint:
     def __hash__(self) -> int:
         return hash(self._coords)
 
+    def ndim(self) -> int:
+        return len(self._coords)
+
     def as_tuple(self) -> Tuple[int, ...]:
         "Return coords as a tuple()."
         return self._coords
@@ -90,22 +65,32 @@ class ZPoint:
         return numpy.array(self)
 
 
-class ZBox:
-    _start: ZPoint
-    _end: ZPoint
+def expect_zpoint_lt_zpoint(
+    a: Iterable[int],
+    b: Iterable[int],
+    value_name: str = "a",
+    expected_name: str = "b",
+):
+    a = ZPoint.coerce(a).as_tensor()
+    b = ZPoint.coerce(b).as_tensor()
+
+    if (a.shape != b.shape) or not (a <= b).all():
+        raise AssertionError(
+            f"Expected {value_name}:{a} to be strictly <= {expected_name}:{b}"
+        )
 
 
 class ZRange:
-    _start: torch.Tensor
-    _end: torch.Tensor
+    _start: ZPoint
+    _end: ZPoint
 
     def __init__(
         self,
-        start: torch.Tensor,
-        end: torch.Tensor,
+        start: Iterable[int],
+        end: Iterable[int],
     ):
-        self._start = torch.tensor(start)
-        self._end = torch.tensor(end)
+        self._start = ZPoint.coerce(start)
+        self._end = ZPoint.coerce(end)
 
         expect_zpoint_lt_zpoint(
             self._start,
@@ -114,14 +99,14 @@ class ZRange:
             expected_name="end",
         )
 
-    def start(self) -> torch.Tensor:
+    def start(self) -> ZPoint:
         return self._start
 
-    def end(self) -> torch.Tensor:
+    def end(self) -> ZPoint:
         return self._end
 
     def shape(self) -> torch.Tensor:
-        return self._end - self._start
+        return self._end.as_tensor() - self._start.as_tensor()
 
     def card(self) -> int:
         return int(self.shape().prod().item())
