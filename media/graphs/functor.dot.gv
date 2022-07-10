@@ -1,0 +1,38 @@
+digraph G {
+    graph [rankdir=TB, compound=true, nodesep=1];
+
+    subgraph cluster_0 {
+        label = "abstract";
+
+        "a";
+        "f";
+        "b";
+
+        "a" -> "f" -> "b";
+    }
+
+
+    subgraph cluster_1 {
+        label = "embedded";
+        labelloc = "b";
+
+        "E(a)";
+        "E(f)";
+        "E(b)";
+
+        "E(a)" -> "E(f)" -> "E(b)";
+    }
+
+    a -> "E(a)" [constraint=false];
+    b -> "E(b)" [constraint=false];
+
+    f -> "E(f)" [
+        constraint=false,
+        ltail=cluster_0,
+        lhead=cluster_1,
+        label="E",
+        color = "black:invis:black",
+        arrowsize=3,
+        arrowhead=empty,
+    ]
+}

@@ -1,0 +1,6 @@
+#!/bin/bash
+
+echo "Rebuilding Media ..."
+
+make -C media/graphs
+

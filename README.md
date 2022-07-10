@@ -41,15 +41,7 @@ that a computation performed outside the environment will arrive at the same
 result as one performed by first embedding the data and the operation into the
 environment:
 
-     a    ->   op    ->   op(a)
-
-     |         |           |
-     F         F           F
-     |         |           |
-     v         V           V
-
-    F(a)  ->  F(op)  ->  F(op)(b)
-    
+![functor](media/graphs/functor.dot.png)
 
 The goal of an arbitrary scale compute environment is that scale is a function
 of the evaluator, not the algorithms; to the limits of
@@ -57,25 +49,25 @@ of the evaluator, not the algorithms; to the limits of
 project, so we start with that goal and attempt to work backwards, deriving
 mechanics that do not make the problem worse.
 
-> #### What do me mean by "derive"?
-> As the goal is to produce a provable embedding environment, we start with the
-> rules of such an environment, and incrementally add operations which do not
-> violate those rules, attempting to work backwards from simple operations
-> to an environment which is actually useful for defining real programs.
-> 
-> At each step, we select the simplest consistent extensions we can find
-> which maintain the properties we're interested in, so in some sense the
-> R&D approach resembles derivation over design.
-> 
-> The goal at the end of the project is to be able to hand an arbitrarily
-> complex algorithm to an arbitrarily aggressive execution scheduler, and
-> know, provably, that the results of execution will be identical to the
-> most naive scheduler we can define over the same graph.
-> 
-> This approach has been very successful in the world of dataflow languages,
-> SQL query planners, and the Haskell / Functional Programming stream
-> fusion environments, and the research project is to apply the same ideas
-> to tensor operations with kernel window visibility.
+### What do me mean by "derive"?
+As the goal is to produce a provable embedding environment, we start with the
+rules of such an environment, and incrementally add operations which do not
+violate those rules, attempting to work backwards from simple operations
+to an environment which is actually useful for defining real programs.
+
+At each step, we select the simplest consistent extensions we can find
+which maintain the properties we're interested in, so in some sense the
+R&D approach resembles derivation over design.
+
+The goal at the end of the project is to be able to hand an arbitrarily
+complex algorithm to an arbitrarily aggressive execution scheduler, and
+know, provably, that the results of execution will be identical to the
+most naive scheduler we can define over the same graph.
+
+This approach has been very successful in the world of dataflow languages,
+SQL query planners, and the Haskell / Functional Programming stream
+fusion environments, and the research project is to apply the same ideas
+to tensor operations with kernel window visibility.
 
 We are not going to attempt to define an execution environment which can arbitrarily
 scale arbitrary programs, the halting problem proves that approach will not be successful;
