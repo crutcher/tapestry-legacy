@@ -1,0 +1,174 @@
+digraph G {
+    rankdir=LR;
+
+    x [
+        shape="plain",
+        label=<
+        <table cellpadding="8">
+            <tr>
+                <td>x<sub>i,m</sub></td>
+                <td>…</td>
+                </tr>
+            <tr>
+                <td>…</td>
+                <td>…</td>
+                </tr>
+            </table>
+        >,
+    ];
+
+    y [
+        shape="plain",
+        label=<
+        <table cellpadding="8">
+            <tr>
+                <td>y<sub>i,n</sub></td>
+                <td>…</td>
+                </tr>
+            <tr>
+                <td>…</td>
+                <td>…</td>
+                </tr>
+            </table>
+        >,
+    ];
+
+    w [
+        shape="plain",
+        label=<
+        <table cellpadding="8">
+            <tr>
+                <td>w<sub>m,n</sub></td>
+                <td>…</td>
+                </tr>
+            <tr>
+                <td>…</td>
+                <td>…</td>
+                </tr>
+            </table>
+        >,
+    ];
+
+    b [
+        shape="plain",
+        label=<
+        <table cellpadding="8">
+            <tr>
+                <td>b<sub>n</sub></td>
+                <td>…</td>
+                </tr>
+            </table>
+        >,
+    ];
+
+
+    subgraph cluster_0 {
+
+    x0 [
+        shape="plain",
+        label=<
+        <table cellpadding="8">
+            <tr>
+                <td>x<sub>0,m</sub></td>
+                <td>…</td>
+                </tr>
+            <tr>
+                <td>…</td>
+                <td>…</td>
+                </tr>
+            <tr>
+                <td>x<sub>k,m</sub></td>
+                <td>…</td>
+                </tr>
+            </table>
+        >,
+    ];
+
+    op0 [label=<Linear<sub>0</sub>>];
+
+    y0 [
+        shape="plain",
+        label=<
+        <table cellpadding="8">
+            <tr>
+                <td>y<sub>0,n</sub></td>
+                <td>…</td>
+                </tr>
+            <tr>
+                <td>…</td>
+                <td>…</td>
+                </tr>
+            <tr>
+                <td>y<sub>k,n</sub></td>
+                <td>…</td>
+                </tr>
+            </table>
+        >,
+    ];
+
+    x0 -> op0;
+    op0 -> y0;
+
+    }
+
+    subgraph cluster_1 {
+
+    xk [
+        shape="plain",
+        label=<
+        <table cellpadding="8">
+            <tr>
+                <td>x<sub>k+1,m</sub></td>
+                <td>…</td>
+                </tr>
+            <tr>
+                <td>…</td>
+                <td>…</td>
+                </tr>
+            <tr>
+                <td>x<sub>i,m</sub></td>
+                <td>…</td>
+                </tr>
+            </table>
+        >,
+    ];
+
+    yk [
+        shape="plain",
+        label=<
+        <table cellpadding="8">
+            <tr>
+                <td>y<sub>k+1,m</sub></td>
+                <td>…</td>
+                </tr>
+            <tr>
+                <td>…</td>
+                <td>…</td>
+                </tr>
+            <tr>
+                <td>y<sub>i,m</sub></td>
+                <td>…</td>
+                </tr>
+            </table>
+        >,
+    ];
+
+    opk [label=<Linear<sub>1</sub>>];
+
+    xk -> opk;
+    opk -> yk;
+
+    }
+
+
+    w -> op0;
+    w -> opk;
+
+    b -> op0;
+    b -> opk;
+
+    x -> x0;
+    x -> xk;
+    y0 -> y;
+    yk -> y;
+}

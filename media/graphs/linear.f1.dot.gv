@@ -1,0 +1,76 @@
+digraph G {
+    rankdir=LR;
+
+    x [
+        shape="plain",
+        label=<
+        <table cellpadding="8">
+            <tr>
+                <td>x<sub>i,m</sub></td>
+                <td>…</td>
+                </tr>
+            <tr>
+                <td>…</td>
+                <td>…</td>
+                </tr>
+            </table>
+        >,
+    ];
+
+
+    w [
+        shape="plain",
+        label=<
+        <table cellpadding="8">
+            <tr>
+                <td>w<sub>m,n</sub></td>
+                <td>…</td>
+                </tr>
+            <tr>
+                <td>…</td>
+                <td>…</td>
+                </tr>
+            </table>
+        >,
+    ];
+
+    op [label="Linear"];
+
+    b [
+        shape="plain",
+        label=<
+        <table cellpadding="8">
+            <tr>
+                <td>b<sub>n</sub></td>
+                <td>…</td>
+                </tr>
+            </table>
+        >,
+    ];
+
+    y [
+        shape="plain",
+        label=<
+        <table cellpadding="8">
+            <tr>
+                <td>y<sub>i,n</sub></td>
+                <td>…</td>
+                </tr>
+            <tr>
+                <td>…</td>
+                <td>…</td>
+                </tr>
+            </table>
+        >,
+    ];
+
+
+    x -> op;
+    op -> y;
+
+    w -> op;
+    // layout hack:
+    op -> b [dir=back];
+
+    { rank=same; w; b; op; }
+}
