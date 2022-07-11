@@ -2,8 +2,6 @@ digraph G {
     graph [rankdir=TB, compound=true, nodesep=1];
 
     subgraph cluster_0 {
-        label = "abstract";
-
         "a";
         "f";
         "b";
@@ -13,9 +11,6 @@ digraph G {
 
 
     subgraph cluster_1 {
-        label = "embedded";
-        labelloc = "b";
-
         "E(a)";
         "E(f)";
         "E(b)";

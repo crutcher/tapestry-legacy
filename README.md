@@ -1,111 +1,125 @@
-# Tapestrey
+# Tapestry
+
 crutcher@gmail.com, crutcher@meta.com
 
-## Terminology
+## Abstract
 
-### Tensor Fabrics
+Tapestry is a project to prototype "Spark, for GPU Accelerated AI/ML Tensor Algorithms".
 
-Lacking a better name for "a lot of CUDA-device/PUs/TPUs networked together",
-I'm going to call the general idea a "Tensor Fabric", as "fabric" is a pretty
-common term in networking, and distributed computing, and "tensors" are what
-we're interested in.
+There would be significant value in divorcing the development of tensor applications from the scheduling and
+efficient execution of those applications. One problem requires specialized training in statistics, machine learning,
+physics, or some other branch of math that cares about tensors; the other requires specialized training in
+scheduling theory, distributed system engineering, and compiler design.
 
-## Goals
-Tapestry is a project to derive an initial proof-of-concept for a restricted
-arbitrary-scale tensor compute evaluation environment.
+Exiting dataflow environments are already
+[embarasingly parallel](https://en.wikipedia.org/wiki/Embarrassingly_parallel), able to exploit large numbers of workers
+simultaneously, while computing effective function dependencies between calculations.
 
+Most tensor algorithms used in AI/ML are, in principle, embarrassingly parallel at the level of the functional
+dependencies of individual data cells, but existing tensor algorithm expression languages make it difficult for
+execution environments to exploit this property.
 
-We'd like to be able to say, for some large family of algorithms,
-that we have an embedding `E` such that embedding the data and the algorithm
-into our embedding environment produces the same result, and *goes really fast*:
+The challenge of functionally exploiting parallelism in tensor algorithms across machines lies in:
 
-    data -> <algorithm> -> result
+* expressing the parallelism opportunities to the scheduler,
+* while maintaining spatial and temporal locality needed to exploit CUDA/GPU/TPU environments,
+* and exposing the above in a framework which remains understandable to application developers.
 
-    E(data) -> E(<algorithm>) -> E(result)
+A significant amount of work has been done in decorating existing AI/ML algorithms with parallelism points, either
+by batching workers, or splitting layers across devices, or both; and in attempting to determine locations that
+those annotations can be safely auto-inserted by sufficiently smart compilers.
 
-The goal is to be able to write tensor algorithms in an embedding environment
-accessible to programmers, which maintain enough meta-information that an execution
-environment can provably scale those algorithms to arbitraryly large distributed
-compute CUDA/GPU/TPU tensor-fabric resources both accurately (producing the correct
-results) and efficiently (making maximum use of available compute resources).
+Tapestry aims to demonstrate an approach to the problem from the other side, by demonstrating extensions to the
+dataflow graph execution model (Parallel Collections + Parallel Operations) which permit fine-grained description of
+the covariance between tensor spatial locality and CUDA kernel time locality in operations.
 
-Embedding environments are a concept from both formal semantics in computation
-language design, and in category theory in the definition of Functors. They define
-environments which, if we follow the operation and composition rules, we can prove
-that transformations on the expressions which maintain the environment's invariants
-will continue to produce the same results, or "mean" the same things.
+There are 4 primary components needed to demonstrate this:
 
-Sometimes described using the "diagram chasing" equations of category theory;
-we can assemble proofs of equivalence under transformation by establishing
-that a computation performed outside the environment will arrive at the same
-result as one performed by first embedding the data and the operation into the
-environment:
+* a demonstration that AI/ML algorithms can fit in dataflow languages at all,
+* a demonstration of at least one working solution to space/time covariance graph description,
+* a demonstration that that covariance description can be used to schedule dense operations,
+* a demonstration that an api built on this can be aligned with existing AI/ML design patterns.
+
+## API Design Overview
+
+Existing dataflow environments already permit massive horizontal scaling of parallel operations over parallel
+collections.
+
+For reference, see:
+
+* [Apache Spark](https://github.com/apache/spark)
+* [Apache Beam](https://beam.apache.org/)
+* [Google Dataflow](https://cloud.google.com/dataflow)
+
+These environments have several components:
+
+* *a coordinator environment* - a traditional sequential programming environment which interacts with the external
+  world, constructs operation graphs, dispatches
+  those graphs to be executed, awaits their results, and potentially kicks off subsequent dependent calculations.
+* *an operation environment* - constructed of idempotent parallel collections and operations which describes operations
+  in a restricted embedding environment, and whose execution scheduling is managed by the scaling executor.
+
+Writing applications in these environments does require additional training; while the runtime expectations of the
+coordinator environments are relatively serial (construct an operation graph, dispatch it for execution, wait for
+completion, observe the results and make further control flow choices); the runtime expectations of the operation
+environment (hermetic, idempotent, no IO to other systems, no iteration or batch visibility), and the semantics
+of the parallel collections in the operation environment require additional training over traditional serial/local
+execution environments.
+
+However, decades of api research in this space have produced many reusable design patterns; not only in the way to
+structure and debug these APIs in usable ways, but also in approaches towards collecting them into higher-level
+primitives.
+
+As we see in dataflow languages, and can expect to see here, most users, combining pre-built layers and combinators
+of standard components, should not need to know or care how the underlying covariance is described, or how the
+underlying kernels are scheduled.
+
+### Dataflow Environments use Category Theory for the Win
+
+Dataflow languages have converged on an observation about distributed scheduling; by *strictly* restricting primitive
+operations, and algorithms built up from graphs of those operations, to a few simple ideas from category
+theory:
+
+* maps (functions),
+* monoids (reduces),
+* and arrows (chained composition)
+
+We can build arbitrarily aggressive compilation, scheduling, and exeuction environments which provably produce
+the same results.
+
+Each of these ideas come with a few checkable rules or laws about their operation behavior; and we can use embedding
+proofs to
+prove
+that an algorithm whose component parts do not violate those rules, written in these terms of these ideas, can be
+mechanically restructured to large number of equivalent algorithms in different embeddings, provided that the
+embeddings maintain the invariants of those rules.
+
+The transformed program is guaranteed to be equivalent to the source program:
 
 ![functor](media/graphs/functor.dot.png)
 
-The goal of an arbitrary scale compute environment is that scale is a function
-of the evaluator, not the algorithms; to the limits of
-[Ahmdal's Law](https://en.wikipedia.org/wiki/Amdahl%27s_law); this is an ambitious
-project, so we start with that goal and attempt to work backwards, deriving
-mechanics that do not make the problem worse.
+In practice, we see that these languages permit specialization of R&D streams:
 
-### What do me mean by "derive"?
-As the goal is to produce a provable embedding environment, we start with the
-rules of such an environment, and incrementally add operations which do not
-violate those rules, attempting to work backwards from simple operations
-to an environment which is actually useful for defining real programs.
+* library/application developers using high-level operations to build functions, reductions, and graphs;
+* category theory developers writing new composite high-level operations to expose functionality in reusable ways;
+* and a (much smaller) group of system developers building and optimizing the execution / embedding environments.
 
-At each step, we select the simplest consistent extensions we can find
-which maintain the properties we're interested in, so in some sense the
-R&D approach resembles derivation over design.
+*Particularly, advancement of research and development at the execution layer accelerates all programs.*
 
-The goal at the end of the project is to be able to hand an arbitrarily
-complex algorithm to an arbitrarily aggressive execution scheduler, and
-know, provably, that the results of execution will be identical to the
-most naive scheduler we can define over the same graph.
+### But Does it Blend?
 
-This approach has been very successful in the world of dataflow languages,
-SQL query planners, and the Haskell / Functional Programming stream
-fusion environments, and the research project is to apply the same ideas
-to tensor operations with kernel window visibility.
+CUDA/GPU/TPU execution environments are fast because they can dispatch dense operations in parallel on vector unit
+hardware. A large family of kernel operations have been developed to take advantage of that hardware, and at first
+glance making the argument that "Everything fits in maps, monoids, and arrows" is not obvious.
 
-We are not going to attempt to define an execution environment which can arbitrarily
-scale arbitrary programs, the halting problem proves that approach will not be successful;
-we're going to attempt to restrict our embedding operations to those which can
-be described in a subset of scalable operations, and build up a formal semantics
-upon that framework.
+Tapestry will attempt to demonstrate that the following common AI/ML components can be meaningfully embedded on a
+framework of (map, monoid, arrow), and densely scheduled to memory and vector device:
 
+* Activation - _trivial, this is just map_
+* Convolution - _this is *also* map, but it's less obvious_
+* Matmul / nn.Linear - _this is map if weights are small, and map+monoid if they are not_
+* Sum, Variance - _this is monoid_
 
-## Design Overview
+## Exploring Matmul / nn.Linear
 
-Existing dataflow environments already permit massive horizontal scaling of
-parallel operations over parallel collections.
-
-For reference, see:
-  * [Apache Spark](https://github.com/apache/spark)
-  * [Apache Beam](https://beam.apache.org/)
-  * [Google Dataflow](https://cloud.google.com/dataflow)
-
-These environments have several components:
-  * A coordinator environment - a traditional sequential programming environment
-    which interacts with the external world, constructs operation graphs, dispatches 
-    those graphs to be executed, awaits their results, and potentially kicks off 
-    subsequent dependent calculations.
-  * An operation environment - constructed of idempotent parallel collections and operations
-    which describes operations in a restricted embedding environment, and whose
-    execution scheduling is managed by the scaling executor.
-
-If we focus on what these environments provide, in terms of parallel collections,
-we'll see that in general these collections exist lacking neighbor locality,
-one point of data in a given collection has no guaranteed locality relative
-to any other point of data.
-
-Tensor algorithms frequently operate on convolutions over shared data, we could
-express most tensor operations in terms of dataflow environments, at the cost
-of losing all of the block data and operation acceleration which tensor fabric
-processors (CUDA/GPU/TPU/etc) provide.
-
-The design goal is to copy most of the ideas from existing dataflow languages
-about the structure of a coordinator environment, while extending the notion
-of *parallel collections* and *parallel operations* to describe data-locality
-of the operation data needs, and time-locality of the CUDA kernels.
+This section is an extended exploration of matrix multiplication (nn.Linear) for AI/ML applications.
