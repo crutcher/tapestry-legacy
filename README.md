@@ -169,3 +169,6 @@ functional dependiences of the result cells, and maps to slices of the input and
 
 ![linear.index1](media/graphs/linear.index1.dot.png)
 
+Any contiguous partitioning over the *index* space will be equivalent to some combination of rewrites over sharding 
+by *i* and sharding by *n*, and will produce spatially coherent leaf operations to dispatch to CUDA/GPU/TPU kernels.
+
