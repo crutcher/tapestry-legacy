@@ -176,3 +176,35 @@ by *i* and sharding by *n*, and will produce spatially coherent leaf operations 
 
 ![linear.index2](media/graphs/linear.index2.dot.png)
 
+### Rewriting Linear over m (axial sum reduction)
+
+Examining the data dependencies of *Linear*, we see we cannot rewrite over *m* and still use the coherent leaf 
+operation; each cell of output depends on an entire row of the *x* tensor, and an entire column of the *w* tensor.
+
+But if we're willing to examine the content of the leaf, we can see that:
+
+    y(i, n) := b(n) + sum(a=[0, m-1], x(i,a) * w(a,n))
+    y(i, n) := b(n) + sum(a=[0, m-1], x(i,a) * w(a,n))
+    y(i, n) := b(n) + sum(a=[0, k], x(i,a) * w(a,n)) + sum(a=[k+1, m], x(i,a) * w(a,n))
+
+If we now introduce two alternative leaf operations *matmul* and *sum*; we can rewrite this by introducing a new
+accumulation dimension *k* for the sharded partial results:
+
+![linear.axial1](media/graphs/linear.axial1.dot.png)
+
+This rewrite requires us to understand the relationship between alternative leaf operations, and make that visible 
+to the graph scheduler.
+
+### Summarizing Linear Rewrites
+
+At this point, we've found a number of production rules defining equivalent embeddings of *Linear*:
+
+* *Linear* := { *Linear* }
+* *Linear* := *matmul* => *sum*
+* *matmul* := { *matmul* }
+* *sum* := { *sum* }
+
+Each of these transformations will produce an operation graph with different space/time costs to evaluation; and
+starting with a single *Linear* operation, we can search over execution plans to minimize that cost, without any 
+change to the initial application's generation of that operation graph.
+
