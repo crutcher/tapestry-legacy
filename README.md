@@ -151,8 +151,8 @@ Under fixed *W* and *B*, nn.Linear is a *map* over the *i* (*batch*) input dimen
 
 ### Rewriting Linear over n (nodes)
 
-Again, by examination of the *Linear* operation, we can see that rewriting into smaller operations over the *n* 
-(nodes) dimension, and mechanically merging the results along a different axis, will produce the same results. 
+Again, by examination of the *Linear* operation, we can see that rewriting into smaller operations over the *n*
+(nodes) dimension, and mechanically merging the results along a different axis, will produce the same results.
 
 ![linear.f3](media/graphs/linear.f3.dot.png)
 
@@ -164,8 +164,8 @@ In this case, we spatially shard both *W* and *b*, but not *X*; but we still yie
 
 ### Defining an index space over Linear
 
-Examining the operations in Linear, we can invent an *index* space which corresponds to the functional dependiences
-of the result cells, and maps to slices of the input and output operations:
+Combining these observations over the operations in Linear, we can invent an *index* space which corresponds to the
+functional dependiences of the result cells, and maps to slices of the input and output operations:
 
 ![linear.index1](media/graphs/linear.index1.dot.png)
 
