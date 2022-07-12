@@ -4,41 +4,9 @@ digraph G {
     x [
         shape="plain",
         label=<
-        <table cellpadding="8">
-            <tr>
-                <td bgcolor="#D6EAF8">x<sub>i,m</sub></td>
-                <td bgcolor="#D6EAF8">…</td>
-                </tr>
-            <tr>
-                <td bgcolor="#EBDEF0">…</td>
-                <td bgcolor="#EBDEF0">⋱</td>
-                </tr>
-            </table>
-        >,
-    ];
-
-    y [
-        shape="plain",
-        label=<
-        <table cellpadding="8">
-            <tr>
-                <td bgcolor="#D6EAF8">y<sub>i,n</sub></td>
-                <td bgcolor="#D6EAF8">…</td>
-                </tr>
-            <tr>
-                <td bgcolor="#EBDEF0">…</td>
-                <td bgcolor="#EBDEF0">⋱</td>
-                </tr>
-            </table>
-        >,
-    ];
-
-    w [
-        shape="plain",
-        label=<
         <table bgcolor="#D5F5E3" cellpadding="8">
             <tr>
-                <td>w<sub>m,n</sub></td>
+                <td>x<sub>i,m</sub></td>
                 <td>…</td>
                 </tr>
             <tr>
@@ -49,13 +17,29 @@ digraph G {
         >,
     ];
 
+    w [
+        shape="plain",
+        label=<
+        <table bgcolor="#D5F5E3" cellpadding="8">
+            <tr>
+                <td bgcolor="#D6EAF8">w<sub>m,n</sub></td>
+                <td bgcolor="#EBDEF0">…</td>
+                </tr>
+            <tr>
+                <td bgcolor="#D6EAF8">…</td>
+                <td bgcolor="#EBDEF0">⋱</td>
+                </tr>
+            </table>
+        >,
+    ];
+
     b [
         shape="plain",
         label=<
         <table bgcolor="#D5F5E3" cellpadding="8">
             <tr>
-                <td>b<sub>n</sub></td>
-                <td>…</td>
+                <td bgcolor="#D6EAF8">b<sub>n</sub></td>
+                <td bgcolor="#EBDEF0">…</td>
                 </tr>
             </table>
         >,
@@ -64,21 +48,37 @@ digraph G {
 
     subgraph cluster_0 {
 
-    x0 [
+    w0 [
         shape="plain",
         label=<
         <table bgcolor="#D6EAF8" cellpadding="8">
             <tr>
-                <td>x<sub>0,m</sub></td>
+                <td>w<sub>0,0</sub></td>
                 <td>…</td>
+                <td>w<sub>0,k</sub></td>
                 </tr>
             <tr>
                 <td>…</td>
                 <td>…</td>
+                <td>…</td>
                 </tr>
             <tr>
-                <td>x<sub>k,m</sub></td>
+                <td>w<sub>i,0</sub></td>
                 <td>…</td>
+                <td>w<sub>i,k</sub></td>
+                </tr>
+            </table>
+        >,
+    ];
+
+    b0 [
+        shape="plain",
+        label=<
+        <table bgcolor="#D6EAF8" cellpadding="8">
+            <tr>
+                <td>b<sub>0</sub></td>
+                <td>…</td>
+                <td>b<sub>k</sub></td>
                 </tr>
             </table>
         >,
@@ -97,43 +97,62 @@ digraph G {
         label=<
         <table bgcolor="#D6EAF8" cellpadding="8">
             <tr>
-                <td>y<sub>0,n</sub></td>
+                <td>y<sub>0,0</sub></td>
                 <td>…</td>
+                <td>y<sub>0,k</sub></td>
                 </tr>
             <tr>
                 <td>…</td>
                 <td>…</td>
+                <td>…</td>
                 </tr>
             <tr>
-                <td>y<sub>k,n</sub></td>
+                <td>y<sub>i,0</sub></td>
                 <td>…</td>
+                <td>y<sub>i,k</sub></td>
                 </tr>
             </table>
         >,
     ];
 
-    x0 -> op0;
+    b0 -> op0;
     op0 -> y0;
 
     }
 
     subgraph cluster_1 {
 
-    xk [
+    wk [
         shape="plain",
         label=<
         <table bgcolor="#EBDEF0" cellpadding="8">
             <tr>
-                <td>x<sub>k+1,m</sub></td>
+                <td>w<sub>0,k+1</sub></td>
                 <td>…</td>
+                <td>w<sub>0,n</sub></td>
                 </tr>
             <tr>
                 <td>…</td>
                 <td>…</td>
+                <td>…</td>
                 </tr>
             <tr>
-                <td>x<sub>i,m</sub></td>
+                <td>w<sub>i,k+1</sub></td>
                 <td>…</td>
+                <td>w<sub>i,n</sub></td>
+                </tr>
+            </table>
+        >,
+    ];
+
+    bk [
+        shape="plain",
+        label=<
+        <table bgcolor="#EBDEF0" cellpadding="8">
+            <tr>
+                <td>b<sub>k+1</sub></td>
+                <td>…</td>
+                <td>b<sub>n</sub></td>
                 </tr>
             </table>
         >,
@@ -144,16 +163,19 @@ digraph G {
         label=<
         <table bgcolor="#EBDEF0" cellpadding="8">
             <tr>
-                <td>y<sub>k+1,m</sub></td>
+                <td>y<sub>0,k+1</sub></td>
                 <td>…</td>
+                <td>y<sub>0,n</sub></td>
                 </tr>
             <tr>
                 <td>…</td>
                 <td>…</td>
+                <td>…</td>
                 </tr>
             <tr>
-                <td>y<sub>i,m</sub></td>
+                <td>y<sub>i,k+1</sub></td>
                 <td>…</td>
+                <td>y<sub>i,n</sub></td>
                 </tr>
             </table>
         >,
@@ -167,20 +189,40 @@ digraph G {
         margin=0.3
     ];
 
-    xk -> opk;
+    bk -> opk;
     opk -> yk;
 
     }
 
+    y [
+        shape="plain",
+        label=<
+        <table cellpadding="8">
+            <tr>
+                <td bgcolor="#D6EAF8">y<sub>i,n</sub></td>
+                <td bgcolor="#EBDEF0">…</td>
+                </tr>
+            <tr>
+                <td bgcolor="#D6EAF8">…</td>
+                <td bgcolor="#EBDEF0">⋱</td>
+                </tr>
+            </table>
+        >,
+    ];
 
-    w -> op0 [weight=0];
-    w -> opk [weight=0];
 
-    b -> op0 [weight=0];
-    b -> opk [weight=0];
+    x -> op0 [weight=0];
+    x -> opk [weight=0];
 
-    x -> x0;
-    x -> xk;
+    w -> w0;
+    w -> wk;
+
+    b -> b0;
+    b -> bk;
+
+    w0 -> op0;
+    wk -> opk;
+
     y0 -> y;
     yk -> y;
 }

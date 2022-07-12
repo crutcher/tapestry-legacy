@@ -4,14 +4,14 @@ digraph G {
     x [
         shape="plain",
         label=<
-        <table cellpadding="8">
+        <table bgcolor="#D6EAF8" cellpadding="8">
             <tr>
                 <td>x<sub>i,m</sub></td>
                 <td>…</td>
                 </tr>
             <tr>
                 <td>…</td>
-                <td>…</td>
+                <td>⋱</td>
                 </tr>
             </table>
         >,
@@ -21,25 +21,32 @@ digraph G {
     w [
         shape="plain",
         label=<
-        <table cellpadding="8">
+        <table bgcolor="#D6EAF8" cellpadding="8">
             <tr>
                 <td>w<sub>m,n</sub></td>
                 <td>…</td>
                 </tr>
             <tr>
                 <td>…</td>
-                <td>…</td>
+                <td>⋱</td>
                 </tr>
             </table>
         >,
     ];
 
-    op [label="Linear"];
+    op [label="Linear", shape="rarrow", margin=0.3];
+    op [
+        label=Linear,
+        shape=rarrow,
+        style=filled,
+        fillcolor="#E5E8E8",
+        margin=0.3
+    ];
 
     b [
         shape="plain",
         label=<
-        <table cellpadding="8">
+        <table bgcolor="#D6EAF8" cellpadding="8">
             <tr>
                 <td>b<sub>n</sub></td>
                 <td>…</td>
@@ -51,14 +58,14 @@ digraph G {
     y [
         shape="plain",
         label=<
-        <table cellpadding="8">
+        <table bgcolor="#D6EAF8" cellpadding="8">
             <tr>
                 <td>y<sub>i,n</sub></td>
                 <td>…</td>
                 </tr>
             <tr>
                 <td>…</td>
-                <td>…</td>
+                <td>⋱</td>
                 </tr>
             </table>
         >,
@@ -69,8 +76,5 @@ digraph G {
     op -> y;
 
     w -> op;
-    // layout hack:
-    op -> b [dir=back];
-
-    { rank=same; w; b; op; }
+    b -> op;
 }

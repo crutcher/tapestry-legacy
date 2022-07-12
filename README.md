@@ -84,10 +84,10 @@ theory:
 * monoids (reduces),
 * and arrows (chained composition)
 
-We can build arbitrarily aggressive compilation, scheduling, and exeuction environments which provably produce
+We can build arbitrarily aggressive compilation, scheduling, and execution environments which provably produce
 the same results.
 
-Each of these ideas come with a few checkable rules or laws about their operation behavior; and we can use embedding
+Each of these ideas come with a few laws about their operation behavior; and we can use embedding
 proofs to prove that an algorithm whose component parts do not violate those rules, written in these terms of these
 ideas, can be mechanically restructured to large number of equivalent algorithms in different embeddings, provided that
 the embeddings maintain the invariants of those rules.
@@ -96,10 +96,10 @@ The transformed program is guaranteed to be equivalent to the source program:
 
 ![functor](media/graphs/functor.dot.png)
 
-Armed with this proof, a large family of mechanical optimizations have already been developed which bring execution 
-throughput and reliability of large programs to levels unreachable by human-maintained algorithms; because the 
-fusion results would be too complex to maintain directly; transparent retries, operation fusion, stacked operation 
-rewrites, local recomputation, result caching; all in the same execution environment, *for free* from the 
+Armed with this proof, a large family of mechanical optimizations have already been developed which bring execution
+throughput and reliability of large programs to levels unreachable by human-maintained algorithms; because the
+fusion results would be too complex to maintain directly; transparent retries, operation fusion, stacked operation
+rewrites, local recomputation, result caching; all in the same execution environment, *for free* from the
 perspective of application developers.
 
 Additionally, in practice, we see that these languages permit specialization of R&D streams:
@@ -136,15 +136,28 @@ can be described as operating on the tensors (X, W, B) and producing (Y):
 On a single CUDA/GPU/TPU device, we can dispatch this entire operation to a matmul kernel followed by an addition
 kernel, or we can dispatch to a single specialized linear or affine transform kernel.
 
-### Sharding over i (batch)
+### Rewriting Linear over i (batch)
 
-If we do not shard over *W* or *B* (suppose we know they are small), we can pick any arbitrary number of split points
-along *i* and rewrite our operation graph:
+By examination of the *Linear* operation, we can see that rewriting into smaller operations over
+the *i* (batch) dimension, and mechanically merging the results, will produce the same result:
 
-![linear.f1](media/graphs/linear.f2.dot.png)
+![linear.f3](media/graphs/linear.f2.dot.png)
 
 Under fixed *W* and *B*, nn.Linear is a *map* over the *i* (*batch*) input dimension. And we can schedule this densely,
 
 * the map shards spatially along *i* in data resources,
 * the map shards temporally along *i* in compute resources,
+* the component blocks still have dense CUDA kernels for efficient dispatch of their smaller data.
+
+### Rewriting Linear over n (nodes)
+
+Again, by examination of the *Linear* operation, we can see that rewriting into smaller operations over the *n* 
+(nodes) dimension, and mechanically merging the results along a different axis, will produce the same results. 
+
+![linear.f3](media/graphs/linear.f3.dot.png)
+
+In this case, we spatially shard both *W* and *b*, but not *X*; but we still yield a map over the *n* (node) dimension.
+
+* the map shards spatially along *n* in data resources,
+* the map shards temporally along *n* in compute resources,
 * the component blocks still have dense CUDA kernels for efficient dispatch of their smaller data.
