@@ -161,3 +161,11 @@ In this case, we spatially shard both *W* and *b*, but not *X*; but we still yie
 * the map shards spatially along *n* in data resources,
 * the map shards temporally along *n* in compute resources,
 * the component blocks still have dense CUDA kernels for efficient dispatch of their smaller data.
+
+### Defining an index space over Linear
+
+Examining the operations in Linear, we can invent an *index* space which corresponds to the functional dependiences
+of the result cells, and maps to slices of the input and output operations:
+
+![linear.index1](media/graphs/linear.index1.dot.png)
+
