@@ -215,14 +215,14 @@ digraph G {
   X -> X0;
   X -> X1;
 
-  K [
+  F [
       shape="plain",
       label=<
       <table cellpadding="8">
         <tr><td>
       <table bgcolor="#D5F5E3" cellpadding="8">
           <tr>
-              <td >k<sub>a,b,k</sub></td>
+              <td >f<sub>a,b,k</sub></td>
               <td >…</td>
               <td>⋰</td>
               </tr>
@@ -285,11 +285,11 @@ digraph G {
   ];
 
   X0 -> Conv0;
-  K -> Conv0;
+  F -> Conv0;
   Conv0 -> Y;
 
   X1 -> Conv1;
-  K -> Conv1;
+  F -> Conv1;
   Conv1 -> Y;
 
 }

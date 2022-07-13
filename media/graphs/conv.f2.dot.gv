@@ -92,14 +92,14 @@ digraph G {
       >,
   ];
 
-  K [
+  F [
       shape="plain",
       label=<
       <table cellpadding="8">
         <tr><td>
       <table bgcolor="#D5F5E3" cellpadding="8">
           <tr>
-              <td >k<sub>a,b,k</sub></td>
+              <td >f<sub>a,b,k</sub></td>
               <td >…</td>
               <td>⋰</td>
               </tr>
@@ -176,7 +176,7 @@ digraph G {
   ];
 
   X -> Conv;
-  K -> Conv;
+  F -> Conv;
   Conv -> Y;
 
   { rank=same; idx; Conv; strides; }
