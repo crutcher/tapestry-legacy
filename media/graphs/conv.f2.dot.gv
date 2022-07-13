@@ -127,7 +127,7 @@ digraph G {
   ];
 
   strides [
-      label="strides: [1,2,…]",
+      label=<strides: [1,<b>2</b>,…]>,
       shape=rectangle,
   ];
 

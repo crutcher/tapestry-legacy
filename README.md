@@ -12,7 +12,7 @@ physics, or some other branch of math that cares about tensors; the other requir
 scheduling theory, distributed system engineering, and compiler design.
 
 Exiting dataflow environments are already
-[embarasingly parallel](https://en.wikipedia.org/wiki/Embarrassingly_parallel), able to exploit large numbers of workers
+[embarrassingly parallel](https://en.wikipedia.org/wiki/Embarrassingly_parallel), able to exploit large numbers of workers
 simultaneously, while computing effective function dependencies between calculations.
 
 Most tensor algorithms used in AI/ML are, in principle, embarrassingly parallel at the level of the functional
