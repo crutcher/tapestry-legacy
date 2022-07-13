@@ -243,5 +243,6 @@ Consider:
 
 ![conv.f3](media/graphs/conv.f3.dot.png)
 
-This new layout has the same computational leaf cost, but has significantly greater data sharing if we're attempting 
-to optimize memory and transport costs of tensors.
+This transformation has the same computational leaf cost; but permits us to recover dense neighbor data sharing of 
+strided conv operations; which can be useful in achieving more efficient tensor network transmission and node memory 
+utilization.
