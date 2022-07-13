@@ -215,3 +215,33 @@ Each of these transformations will produce an operation graph with different spa
 starting with a single *Linear* operation, we can search over execution plans to minimize that cost, without any 
 change to the initial application's generation of that operation graph.
 
+## Exploring Feasibility of Embedding Conv
+
+To explore feasibility of embedding *torch.nn.Conv*, we have to discuss coherent overlapping view regions.
+
+Neighboring *Conv* result cells frequently consume overlapping input data:
+
+![conv.f1](media/graphs/conv.f1.dot.png)
+
+If we take our projection from *index* space to the data spaces for individual points in the *index* space, and 
+compute their overlap, rather than their union; we are still left with coherent blocks to pass to the leaf operation.
+This gives us another constraint on our design:
+
+* Coherent blocks of index projections should yield coherent overlapping blocks to input and output tensors.
+
+Things become more complicated when we consider stride convolutions, where neighboring cells may not consume the 
+same data:
+
+![conv.f2](media/graphs/conv.f2.dot.png)
+
+Naively, our input regions are now non-coherent; and we have a design choice in this situation.
+
+* Compute the overlapping region, which reduces data sharing between operations; or
+* Pre-Slice the input tensors into strided tensors, rewrite the strides and index space provided to the leaf kernels.
+
+Consider:
+
+![conv.f3](media/graphs/conv.f3.dot.png)
+
+This new layout has the same computational leaf cost, but has significantly greater data sharing if we're attempting 
+to optimize memory and transport costs of tensors.

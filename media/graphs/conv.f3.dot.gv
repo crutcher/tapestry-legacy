@@ -1,0 +1,301 @@
+digraph G {
+  rankdir=LR;
+
+  subgraph cluster_0 {
+  idx0 [
+    shape="plain",
+    label=<
+        <table border="0">
+    <tr><td>
+
+      <table cellpadding="8">
+          <tr>
+              <td>⋱</td>
+              <td>…</td>
+              <td>…</td>
+              <td>⋰</td>
+              </tr>
+          <tr>
+              <td>…</td>
+              <td bgcolor="#D6EAF8">i,m</td>
+              <td>…</td>
+              <td>…</td>
+              </tr>
+          <tr>
+              <td>⋰</td>
+              <td>…</td>
+              <td>…</td>
+              <td>⋱</td>
+              </tr>
+          </table>
+	</td></tr>
+
+    <tr><td><i>index</i></td></tr>
+          </table>
+    >,
+  ];
+
+  X0 [
+      shape="plain",
+      label=<
+      <table cellpadding="8">
+          <tr>
+              <td bgcolor="#D6EAF8">⋱</td>
+              <td bgcolor="#D6EAF8">…</td>
+              <td bgcolor="#D6EAF8">…</td>
+              <td>⋰</td>
+              </tr>
+          <tr>
+              <td bgcolor="#D6EAF8">…</td>
+              <td bgcolor="#D6EAF8">x<sub>i,m</sub></td>
+              <td bgcolor="#D6EAF8">…</td>
+              <td>…</td>
+              </tr>
+          <tr>
+              <td bgcolor="#D6EAF8">…</td>
+              <td bgcolor="#D6EAF8">…</td>
+              <td bgcolor="#D6EAF8">…</td>
+              <td>…</td>
+              </tr>
+          <tr>
+              <td>⋰</td>
+              <td>…</td>
+              <td>…</td>
+              <td>⋱</td>
+              </tr>
+          </table>
+      >,
+  ];
+
+
+  Conv0 [
+      label=<Conv<sub>m</sub>>,
+      shape=rarrow,
+      style=filled,
+      fillcolor="#E5E8E8",
+      margin=0.3
+  ];
+
+  strides0 [
+      label="strides: [1,1,…]",
+      shape=rectangle,
+  ];
+
+  strides0 -> Conv0;
+
+  { rank=same; idx0; Conv0; strides0; }
+  }
+
+  subgraph cluster_1 {
+  X1 [
+      shape="plain",
+      label=<
+      <table cellpadding="8">
+          <tr>
+              <td border="3">⋱</td>
+              <td border="3">…</td>
+              <td border="3">…</td>
+              <td>⋰</td>
+              </tr>
+          <tr>
+              <td border="3">…</td>
+              <td border="3">x<sub>i,n</sub></td>
+              <td border="3">…</td>
+              <td>…</td>
+              </tr>
+          <tr>
+              <td border="3">…</td>
+              <td border="3">…</td>
+              <td border="3">…</td>
+              <td>…</td>
+              </tr>
+          <tr>
+              <td>⋰</td>
+              <td>…</td>
+              <td>…</td>
+              <td>⋱</td>
+              </tr>
+          </table>
+      >,
+  ];
+
+  idx1 [
+    shape="plain",
+    label=<
+        <table border="0">
+    <tr><td>
+
+      <table cellpadding="8">
+          <tr>
+              <td>⋱</td>
+              <td>…</td>
+              <td>…</td>
+              <td>⋰</td>
+              </tr>
+          <tr>
+              <td>…</td>
+              <td border="3">i,n</td>
+              <td>…</td>
+              <td>…</td>
+              </tr>
+          <tr>
+              <td>⋰</td>
+              <td>…</td>
+              <td>…</td>
+              <td>⋱</td>
+              </tr>
+          </table>
+	</td></tr>
+
+    <tr><td><i>index</i></td></tr>
+          </table>
+    >,
+  ];
+  Conv1 [
+      label=<Conv<sub>n</sub>>,
+      shape=rarrow,
+      style=filled,
+      fillcolor="#E5E8E8",
+      margin=0.3
+  ];
+
+  strides1 [
+      label="strides: [1,1,…]",
+      shape=rectangle,
+  ];
+
+  strides1 -> Conv1;
+
+  { rank=same; idx1; Conv1; strides1; }
+  }
+
+
+  X [
+      shape="plain",
+      label=<
+      <table cellpadding="8">
+          <tr>
+              <td bgcolor="#D6EAF8">⋱</td>
+              <td border="3">…</td>
+              <td bgcolor="#D6EAF8">…</td>
+              <td border="3">…</td>
+              <td bgcolor="#D6EAF8">…</td>
+              <td border="3">…</td>
+              <td>…</td>
+              <td>⋰</td>
+              </tr>
+          <tr>
+              <td bgcolor="#D6EAF8">…</td>
+              <td border="3">…</td>
+              <td bgcolor="#D6EAF8">x<sub>i,j</sub></td>
+              <td border="3">x<sub>i,j+1</sub></td>
+              <td bgcolor="#D6EAF8">…</td>
+              <td border="3">…</td>
+              <td>…</td>
+              <td>…</td>
+              </tr>
+          <tr>
+              <td bgcolor="#D6EAF8">…</td>
+              <td border="3">…</td>
+              <td bgcolor="#D6EAF8">…</td>
+              <td border="3">…</td>
+              <td bgcolor="#D6EAF8">…</td>
+              <td border="3">…</td>
+              <td>…</td>
+              <td>…</td>
+              </tr>
+          <tr>
+              <td>⋰</td>
+              <td>…</td>
+              <td>…</td>
+              <td>…</td>
+              <td>…</td>
+              <td>…</td>
+              <td>…</td>
+              <td>⋱</td>
+              </tr>
+          </table>
+      >,
+  ];
+
+  X -> X0;
+  X -> X1;
+
+  K [
+      shape="plain",
+      label=<
+      <table cellpadding="8">
+        <tr><td>
+      <table bgcolor="#D5F5E3" cellpadding="8">
+          <tr>
+              <td >k<sub>a,b,k</sub></td>
+              <td >…</td>
+              <td>⋰</td>
+              </tr>
+          <tr>
+              <td>…</td>
+              <td>…</td>
+              <td>…</td>
+              </tr>
+          <tr>
+          	<td>⋰</td>
+              <td>…</td>
+          	<td>⋱</td>
+              </tr>
+          </table>
+	  </td></tr>
+        </table>
+      >,
+  ];
+
+  Y [
+      shape="plain",
+      label=<
+      <table cellpadding="8">
+        <tr><td>
+
+      <table cellpadding="8">
+          <tr>
+              <td>⋱</td>
+              <td>…</td>
+              <td>…</td>
+              <td>…</td>
+              <td>⋰</td>
+              </tr>
+          <tr>
+              <td>…</td>
+              <td bgcolor="#D6EAF8">y<sub>i,j,k</sub></td>
+              <td border="3">y<sub>i,j+1,k</sub></td>
+              <td>…</td>
+              <td>…</td>
+              </tr>
+          <tr>
+              <td>…</td>
+              <td>…</td>
+              <td>…</td>
+              <td>…</td>
+              <td>…</td>
+              </tr>
+          <tr>
+              <td>⋰</td>
+              <td>…</td>
+              <td>…</td>
+              <td>…</td>
+              <td>⋱</td>
+              </tr>
+          </table>
+
+	  </td></tr>
+        </table>
+      >,
+  ];
+
+  X0 -> Conv0;
+  K -> Conv0;
+  Conv0 -> Y;
+
+  X1 -> Conv1;
+  K -> Conv1;
+  Conv1 -> Y;
+
+}
