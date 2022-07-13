@@ -1,0 +1,93 @@
+digraph G {
+  rankdir=LR;
+
+  In [shape=rectangle];
+  W0 [label=<W<sub>0</sub>>, shape=rectangle];
+  B0 [label=<B<sub>0</sub>>, shape=rectangle];
+  Out [shape=rectangle];
+
+  { rank=same; W0; B0; In; Out; }
+
+  Fusion0 [
+    label="Layer > ReLU",
+    shape=rarrow,
+    style=filled,
+    fillcolor="#E5E8E8",
+    margin=0.3
+  ];
+  Fusion1 [
+    label="Layer > ReLU",
+    shape=rarrow,
+    style=filled,
+    fillcolor="#E5E8E8",
+    margin=0.3
+  ];
+
+
+  A0 [label=<A<sub>0</sub>>, shape=rectangle];
+  A1 [label=<A<sub>1</sub>>, shape=rectangle];
+
+  W0 -> Fusion0;
+  W0 -> Fusion1;
+
+  B0 -> Fusion0;
+  B0 -> Fusion1;
+
+  In -> Fusion0;
+  In -> Fusion1;
+
+  Fusion0 -> A0;
+  Fusion0 -> A1;
+  Fusion1 -> A0;
+  Fusion1 -> A1;
+
+
+  A1 -> LossFusion;
+  Out -> LossFusion;
+
+  LossFusion [
+    label="Loss > ReLUGrad",
+    shape=rarrow,
+    style=filled,
+    fillcolor="#E5E8E8",
+    margin=0.3
+  ];
+
+  A0 -> LossFusion;
+  
+  dA0 [label=<dA<sub>0</sub>>, shape=rectangle];
+  LossFusion -> dA0;
+  
+  LinearGrad0 [
+    label="LinearGrad",
+    shape=rarrow,
+    style=filled,
+    fillcolor="#E5E8E8",
+    margin=0.3
+  ];
+  LinearGrad1 [
+    label="LinearGrad",
+    shape=rarrow,
+    style=filled,
+    fillcolor="#E5E8E8",
+    margin=0.3
+  ];
+  
+  In -> LinearGrad0;
+  In -> LinearGrad1;
+  dA0 -> LinearGrad0;
+  dA0 -> LinearGrad1;
+  A0 -> LinearGrad0;
+  A0 -> LinearGrad1;
+  W0 -> LinearGrad0;
+  W0 -> LinearGrad1;
+  B0 -> LinearGrad0;
+  B0 -> LinearGrad1;
+  
+  dW0 [label=<dW<sub>0</sub>>, shape=rectangle];
+  dB0 [label=<dB<sub>0</sub>>, shape=rectangle];
+  LinearGrad0 -> dW0;
+  LinearGrad0 -> dB0;
+  LinearGrad1 -> dW0;
+  LinearGrad1 -> dB0;
+}

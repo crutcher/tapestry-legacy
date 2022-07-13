@@ -102,6 +102,13 @@ fusion results would be too complex to maintain directly; transparent retries, o
 rewrites, local recomputation, result caching; all in the same execution environment, *for free* from the
 perspective of application developers.
 
+Consider a hypothetical graph describing the forward and backward passes of a simple network:
+![graph1](media/graphs/graph1.dot.png)
+
+Under a suitable hypothetical embedding environment, sharding with operation fusion, as seen
+in this example, should be mechanically computable and provably equivalent:
+![graph2](media/graphs/graph2.dot.png)
+
 Additionally, in practice, we see that these languages permit specialization of R&D streams:
 
 * library/application developers using high-level operations to build functions, reductions, and graphs;
@@ -165,7 +172,7 @@ In this case, we spatially shard both *W* and *b*, but not *X*; but we still yie
 ### Defining an index space over Linear
 
 Combining these observations over the operations in Linear, we can invent an *index* space which corresponds to the
-functional dependiences of the result cells, and maps to slices of the input and output operations:
+functional dependencies of the result cells, and maps to slices of the input and output operations:
 
 ![linear.index1](media/graphs/linear.index1.dot.png)
 

@@ -1,0 +1,88 @@
+digraph G {
+  rankdir=LR;
+
+  In [shape=rectangle];
+  W0 [label=<W<sub>0</sub>>, shape=rectangle];
+  B0 [label=<B<sub>0</sub>>, shape=rectangle];
+  Out [shape=rectangle];
+
+  { rank=same; W0; B0; In; Out; }
+
+  subgraph cluster_0 {
+    label="forward";
+
+    Linear0 [
+      label=Linear,
+      shape=rarrow,
+      style=filled,
+      fillcolor="#E5E8E8",
+      margin=0.3
+    ];
+
+    A0 [label=<A<sub>0</sub>>, shape=rectangle];
+
+    Relu0 [
+      label=ReLU,
+      shape=rarrow,
+      style=filled,
+      fillcolor="#E5E8E8",
+      margin=0.3
+    ];
+
+    A1 [label=<A<sub>1</sub>>, shape=rectangle];
+
+  }
+
+  W0 -> Linear0;
+  B0 -> Linear0;
+  In -> Linear0 -> A0 -> Relu0 -> A1 -> Loss -> dA1;
+  Out -> Loss;
+
+  Loss [
+    shape=rarrow,
+    style=filled,
+    fillcolor="#E5E8E8",
+    margin=0.3
+  ];
+
+  subgraph cluster_1 {
+    label="backward";
+
+    dA1 [
+      label=<dA<sub>1</sub>>,
+      shape=rectangle,
+    ];
+   
+    ReLUGrad [
+      shape=rarrow,
+      style=filled,
+      fillcolor="#E5E8E8",
+      margin=0.3
+    ];
+   
+    dA1 -> ReLUGrad;
+    A1 -> ReLUGrad;
+    A0 -> ReLUGrad;
+   
+    dA0 [label=<dA<sub>0</sub>>, shape=rectangle];
+    ReLUGrad -> dA0;
+   
+    LinearGrad [
+      shape=rarrow,
+      style=filled,
+      fillcolor="#E5E8E8",
+      margin=0.3
+    ];
+   
+    In -> LinearGrad;
+    dA0 -> LinearGrad;
+    A0 -> LinearGrad;
+    W0 -> LinearGrad;
+    B0 -> LinearGrad;
+   
+    dW0 [label=<dW<sub>0</sub>>, shape=rectangle];
+    dB0 [label=<dB<sub>0</sub>>, shape=rectangle];
+    LinearGrad -> dW0;
+    LinearGrad -> dB0;
+  }
+}
