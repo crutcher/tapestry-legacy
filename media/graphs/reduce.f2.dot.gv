@@ -1,0 +1,145 @@
+digraph G {
+    rankdir=LR;
+
+    x [
+        shape="plain",
+        label=<
+        <table cellpadding="8">
+            <tr>
+                <td>⋱</td>
+                <td>⋰</td>
+                </tr>
+            <tr>
+                <td bgcolor="#D6EAF8">x<sub>i,r</sub></td>
+                <td bgcolor="#D6EAF8">…</td>
+                </tr>
+            <tr>
+                <td>⋰</td>
+                <td>⋱</td>
+                </tr>
+            </table>
+        >,
+    ];
+
+    subgraph cluster_log {
+      label=<log<sub>b</sub>(r)>;
+
+    subgraph cluster_0 {
+      label="";
+    idx0 [
+        shape="plain",
+        label=<
+	<table border="0">
+        <tr><td>
+          <table cellpadding="8">
+              <tr>
+                <td bgcolor="#D6EAF8">i,k</td>
+                <td>⋰</td>
+                </tr>
+              <tr>
+                <td>⋰</td>
+                <td>⋱</td>
+                </tr>
+              </table>
+	  </td></tr>
+        <tr><td><i>index r0</i></td></tr>
+	  </table>
+        >,
+    ];
+
+    op0 [
+        label=reduce,
+        shape=rarrow,
+        style=filled,
+        fillcolor="#E5E8E8",
+        margin=0.3
+    ];
+
+    { rank=same; op0; idx0; }
+    } // subgraph cluster_0
+
+    subgraph cluster_1 {
+      label="";
+    idx1 [
+        shape="plain",
+        label=<
+	<table border="0">
+        <tr><td>
+          <table cellpadding="8">
+              <tr>
+                  <td bgcolor="#D6EAF8">i</td>
+                  </tr>
+              <tr>
+                  <td>…</td>
+                  </tr>
+              </table>
+	  </td></tr>
+        <tr><td><i>index r1</i></td></tr>
+	  </table>
+        >,
+    ];
+
+    op1 [
+        label=reduce,
+        shape=rarrow,
+        style=filled,
+        fillcolor="#E5E8E8",
+        margin=0.3
+    ];
+
+    { rank=same; op1; idx1; }
+    } // subgraph cluster_1
+
+    z [
+        shape="plain",
+        label=<
+        <table cellpadding="8">
+            <tr>
+                <td>⋱</td>
+                <td>⋰</td>
+                </tr>
+            <tr>
+                <td bgcolor="#D6EAF8">z<sub>i,k</sub></td>
+                <td bgcolor="#D6EAF8">…</td>
+                </tr>
+            <tr>
+                <td>⋰</td>
+                <td>⋱</td>
+                </tr>
+            </table>
+        >,
+    ];
+
+    } // subgraph cluster_log
+
+    y [
+        shape="plain",
+        label=<
+        <table cellpadding="8">
+            <tr>
+                <td>⋱</td>
+                </tr>
+            <tr>
+                <td bgcolor="#D6EAF8">y<sub>i</sub></td>
+                </tr>
+            <tr>
+                <td>⋰</td>
+                </tr>
+            </table>
+        >,
+    ];
+
+
+    x -> op0;
+    op0 -> z;
+
+    idx0 -> x [constraint=false, style=dotted, arrowhead=empty];
+    idx0 -> z [constraint=false, style=dotted, arrowhead=empty];
+
+    z -> op1;
+    op1 -> y;
+
+    idx1 -> z [constraint=false, style=dotted, arrowhead=empty];
+    idx1 -> y [constraint=false, style=dotted, arrowhead=empty];
+
+}

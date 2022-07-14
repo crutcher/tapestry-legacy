@@ -341,6 +341,12 @@ In graph scheduling, we can turn an *N*-scale problem into a `log_b(N)` scale pr
 with leaf operations which can perform more than one merge at a time, *b* can be quite large, 
 and the resulting tree graph can be very shallow.
 
+![reduce.f1](media/graphs/reduce.f1.dot.png)
+
+If we know that an operation has monoid characteristics on a given axis, we show that we can rewrite 
+nodes into *log_b(N)* reduction layers:
+
+![reduce.f2](media/graphs/reduce.f2.dot.png)
 
 ## Collecting Observations
 

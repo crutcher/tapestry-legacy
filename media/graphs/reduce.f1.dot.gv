@@ -1,0 +1,76 @@
+digraph G {
+    rankdir=LR;
+
+    idx [
+        shape="plain",
+        label=<
+	<table border="0">
+        <tr><td>
+          <table cellpadding="8">
+              <tr>
+                  <td bgcolor="#D6EAF8">i</td>
+                  </tr>
+              <tr>
+                  <td>…</td>
+                  </tr>
+              </table>
+	  </td></tr>
+        <tr><td><i>index</i></td></tr>
+	  </table>
+        >,
+    ];
+
+    x [
+        shape="plain",
+        label=<
+        <table cellpadding="8">
+            <tr>
+                <td>⋱</td>
+                <td>⋰</td>
+                </tr>
+            <tr>
+                <td bgcolor="#D6EAF8">x<sub>i,r</sub></td>
+                <td bgcolor="#D6EAF8">…</td>
+                </tr>
+            <tr>
+                <td>⋰</td>
+                <td>⋱</td>
+                </tr>
+            </table>
+        >,
+    ];
+
+    op [
+        label=reduce,
+        shape=rarrow,
+        style=filled,
+        fillcolor="#E5E8E8",
+        margin=0.3
+    ];
+
+    y [
+        shape="plain",
+        label=<
+        <table cellpadding="8">
+            <tr>
+                <td>⋱</td>
+                </tr>
+            <tr>
+                <td bgcolor="#D6EAF8">y<sub>i</sub></td>
+                </tr>
+            <tr>
+                <td>⋰</td>
+                </tr>
+            </table>
+        >,
+    ];
+
+
+    x -> op;
+    op -> y;
+
+    idx -> x [constraint=false, style=dotted, arrowhead=empty];
+    idx -> y [constraint=false, style=dotted, arrowhead=empty];
+
+    { rank=same; op; idx; }
+}
