@@ -44,6 +44,12 @@ There are 4 primary components needed to demonstrate this:
 * a demonstration that that covariance description can be used to schedule dense operations,
 * a demonstration that an api built on this can be aligned with existing AI/ML design patterns.
 
+### Related Work
+
+* *FAX* on *jax.pjit* \
+  https://www.arxiv-vanity.com/papers/2204.06514/ \
+  Appears to be pursuing similar slicing research, using *jax.pjit* as a backend.
+
 ## API Design Overview
 
 Existing dataflow environments already permit massive horizontal scaling of parallel operations over
@@ -348,7 +354,19 @@ nodes into *log_b(N)* reduction layers:
 
 ![reduce.f2](media/graphs/reduce.f2.dot.png)
 
-## Collecting Observations
+## Summarizing Rewrites Observations
+
+Even under index space projection restrictions, we appear to be able to rewrite a large family 
+of operations:
+
+* region mappings and matmuls (inc: Linear, Conv, ReLU)
+* reductions (inc: Sum, Stddev, Avg)
+
+This collection of operations *appears* sufficient to embed most AI/ML applications; so we we 
+can pivot:
+
+* from asking "are these operations embeddable?"
+* to "how do we represent index projections?":
 
 Examining the abstract embeddings considered thus far, we can make a number of observations about
 graph components needed.
