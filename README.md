@@ -87,7 +87,7 @@ restricting primitive operations, and algorithms built up from graphs of those o
 simple ideas from category theory:
 
 * maps (functions),
-* monoids (reduces),
+* [monoids](https://en.wikipedia.org/wiki/Monoid) (reduces),
 * and arrows (chained composition)
 
 We can build arbitrarily aggressive compilation, scheduling, and execution environments which
@@ -268,4 +268,116 @@ Consider:
 This transformation has the same computational leaf cost; but permits us to recover dense neighbor
 data sharing of strided conv operations; which can be useful in achieving more efficient tensor
 network transmission and node memory utilization.
+
+
+## Exploring Feasibility of Embedding Sum (Reduce Operations)
+
+There's a family of operations which need to perform reductions along an entire axis.
+
+* sum, avg
+* product
+* stddev, variance
+
+Many reduction operations can be modeled as [monoids](https://en.wikipedia.org/wiki/Monoid). 
+
+To generically model as a reducible monoid, we need 4 things:
+
+* a way to put a thing into the monoid:
+  * `wrap(x) -> M[x]`
+* an associative way to merge two things in the monoid:
+  * `M[a] • M[b] -> M[c]`
+  * `M[b] • M[a] -> M[c]`
+* a zero element, that can be merged with any element as an identity:
+  * `M[0] • M[a] -> M[a]`
+* a way to remove things from the monoid:
+  * `unwrap(M[x]) -> x`
+
+For many operations (`sum`, `product`), `wrap()` and `unwrap()` can just be identity; the monoid 
+representation is the same as the input and output representation.
+
+Other operations may require global information to complete, so their reduction representation
+may be more complex. Consider `stddev`:
+
+    @dataclass
+    class PartialStats:
+      n: int
+      sum: float
+      sum_of_squares: float
+
+    def zero():
+      return PartialStats(n=0, sum=0.0, sum_of_squares=0.0)
+
+    def op(a, b):
+      # We might even consider rescaling values to prevent overflow here.
+      return PartialStats(
+        n = a.n + b.n,
+        sum = a.sum + b.sum,
+        sum_of_squares = a.sum_of_squares + b.sum_of_squares,
+      )
+
+    def wrap(x):
+      return PartialStats(n=1, sum=x, sum_of_squares=x*x)
+
+    def wrap_all(xs):
+      # equivalent to reduce(op, [wrap(x) for x in xs] + [zero()])
+      return PartialStats(
+        n=len(xs),
+        sum=sum(xs),
+        sum_of_squares=sum(x**2 for x in xs),
+      )
+
+    def unwrap_stddev(p):
+      # beyond the scope of the current example, but we could just as easily
+      # return several stats at once:
+      #   (len, sum, avg, stddev)
+      return math.sqrt((p.sum_of_squares/p.n) - (p.sum/p.n) ** 2)
+
+We might even consider rewriting the scale (*n*) during merge to prevent value overflow.
+
+If we've got a monoidic representation of an expression; we can rewrite arbitrarily long reductions 
+as a tree of smaller reductions and be certain we'll produce the same result.
+
+In graph scheduling, we can turn an *N*-scale problem into a `log_b(N)` scale problem. If we work 
+with leaf operations which can perform more than one merge at a time, *b* can be quite large, 
+and the resulting tree graph can be very shallow.
+
+
+## Collecting Observations
+
+Examining the abstract embeddings considered thus far, we can make a number of observations about
+graph components needed.
+
+* Tensor Transpose/Slice/Merge Nodes
+  * Leaf operations consume and produce *slices* of their input and output tensor spaces; 
+    and rewrites of the leaf operations are accompanied by rewrites of their index spaces,
+    but also the slices they operate on. It will be necessary to expose slice operations
+    at the graph transformation layer.
+* Index Projection Functions
+  * Projection from leaf index spaces to tensor block regions requires some projection/slice 
+    function to specify operation regions. A few properties we know we'll need:
+    * Coherent projections - as the leaf operations are block operations, projections to 
+      neighboring cells in index space should yield coherent/contiguous selections in the target 
+      tensors.
+    * Transformable - there are rewrites we'd like to be able to describe deterministically which
+      alter the index projection of the rewritten nodes; so it's valuable if we can transform
+      those projection functions under rewrites.
+    * overlapping input projections - as we wish to model convolutions, our projection machinery, 
+      and concept of "coherent" should model overlapping neighbor selection regions.
+    * non-overlapping, coherent outputs - for *output* tensors, we'd like to be able to assert 
+      that projections don't produce overlapping regions, and fully fill a target space.
+
+Tensor transposition and slicing is extensively described; it's easy to reuse existing machinery 
+to describe transformations to map one set of tensor indexes to another; our primary goal is to 
+be able to analyze and re-write those transformations. If we are only interested in 
+subdividing work, then we can always append further transpose/slice operations on existing view 
+stacks.
+
+So we can model tensor view operations as index mapping stacks, each producing a "new" tensor, 
+where the intermediate tensors may never be reified.
+
+Index projection is a more complicated case, we're not building 1:1 mapping between cell index 
+locations, but describing regions, and we need a mechanic which permits this, we need a 
+mechanism to check that this projection is valid (to prevent bad operations in the graph, and 
+guard against bad re-writes), and we need a way to rewrite it.
+
 
