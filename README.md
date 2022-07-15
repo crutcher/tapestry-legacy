@@ -12,8 +12,8 @@ in statistics,
 machine learning, physics, or some other branch of math that cares about tensors; the other requires
 specialized training in scheduling theory, distributed system engineering, and compiler design.
 
-Exiting dataflow environments are
-already [embarrassingly parallel](https://en.wikipedia.org/wiki/Embarrassingly_parallel), able to
+Exiting dataflow environments are already
+[embarrassingly parallel](https://en.wikipedia.org/wiki/Embarrassingly_parallel), able to
 exploit large numbers of workers simultaneously, while computing effective function dependencies
 between calculations.
 
@@ -275,7 +275,6 @@ This transformation has the same computational leaf cost; but permits us to reco
 data sharing of strided conv operations; which can be useful in achieving more efficient tensor
 network transmission and node memory utilization.
 
-
 ## Exploring Feasibility of Embedding Sum (Reduce Operations)
 
 There's a family of operations which need to perform reductions along an entire axis.
@@ -284,21 +283,21 @@ There's a family of operations which need to perform reductions along an entire 
 * product
 * stddev, variance
 
-Many reduction operations can be modeled as [monoids](https://en.wikipedia.org/wiki/Monoid). 
+Many reduction operations can be modeled as [monoids](https://en.wikipedia.org/wiki/Monoid).
 
 To generically model as a reducible monoid, we need 4 things:
 
 * a way to put a thing into the monoid:
-  * `wrap(x) -> M[x]`
+    * `wrap(x) -> M[x]`
 * an associative way to merge two things in the monoid:
-  * `M[a] • M[b] -> M[c]`
-  * `M[b] • M[a] -> M[c]`
+    * `M[a] • M[b] -> M[c]`
+    * `M[b] • M[a] -> M[c]`
 * a zero element, that can be merged with any element as an identity:
-  * `M[0] • M[a] -> M[a]`
+    * `M[0] • M[a] -> M[a]`
 * a way to remove things from the monoid:
-  * `unwrap(M[x]) -> x`
+    * `unwrap(M[x]) -> x`
 
-For many operations (`sum`, `product`), `wrap()` and `unwrap()` can just be identity; the monoid 
+For many operations (`sum`, `product`), `wrap()` and `unwrap()` can just be identity; the monoid
 representation is the same as the input and output representation.
 
 Other operations may require global information to complete, so their reduction representation
@@ -340,29 +339,94 @@ may be more complex. Consider `stddev`:
 
 We might even consider rewriting the scale (*n*) during merge to prevent value overflow.
 
-If we've got a monoidic representation of an expression; we can rewrite arbitrarily long reductions 
+If we've got a monoidic representation of an expression; we can rewrite arbitrarily long reductions
 as a tree of smaller reductions and be certain we'll produce the same result.
 
-In graph scheduling, we can turn an *N*-scale problem into a `log_b(N)` scale problem. If we work 
-with leaf operations which can perform more than one merge at a time, *b* can be quite large, 
+In graph scheduling, we can turn an *N*-scale problem into a `log_b(N)` scale problem. If we work
+with leaf operations which can perform more than one merge at a time, *b* can be quite large,
 and the resulting tree graph can be very shallow.
 
 ![reduce.f1](media/graphs/reduce.f1.dot.png)
 
-If we know that an operation has monoid characteristics on a given axis, we show that we can rewrite 
+If we know that an operation has monoid characteristics on a given axis, we show that we can rewrite
 nodes into *log_b(N)* reduction layers:
 
 ![reduce.f2](media/graphs/reduce.f2.dot.png)
 
+## Exploring Feasibility of Embedding Tensor Generators (Random Numbers)
+
+There's a case that's worth talking about, that breaks our existing models, but is extremely common;
+random number generators:
+
+    Y = X * 0.25 * rand_like(X)
+
+Random number generators naively appear to violate our *map* assumptions; if we're concerned about
+producing idempotent results, we have to generate the same values each time; but they're stateful
+between cells, so slicing work units introduces a state management problem.
+
+This is only a concern if we care that:
+
+* nodes can be perfectly re-computed, and
+* any slicing of the index space will produce the *same* random numbers.
+
+Which in turn are properties to preserve primarily if:
+
+* re-executing the tree, under any execution schedule, should yield the same result.
+
+With numerical instability of floating point operations, this is a hard target to pursue;
+different reduction orders or block slicing could yield different results; but it's a good
+target to keep in mind while designing applications, as there are some where bit-identical
+results are highly valued.
+
+Any useful model of tensor operations will need a solution to embedding tensor generators which
+remain stable under sharding.
+
+If, at an api level, we can say "this is a random tensor, from this distribution, with this shape",
+and take indexed slices of that space, the *how* of the tensor's generation becomes opaque to the
+leaf computation, it's just another input.
+
+If we can provide, to a generator, the original index of a sampled tensor space, and the seed
+the tensor is being sampled at (and whatever static parameters the generator takes); we can
+generate stable results for each view block.
+
+    seed = 345
+    sample_shape = [7, 8, 9]
+    sample_point = [3, 1, 5]
+
+    r = g(seed, sample_point)
+
+One potential (horribly slow) implementation would be:
+
+    gen = generator(seed)
+    idx = (sample_point * sample_shape).sum()
+    gen.skip(idx)
+
+    r = gen.next()
+
+This is a lot of wasted work, but is easy to define and stable, and works with most random number
+generators.
+
+We could potentially save some computation by examination of the selected region, and construction
+of coherent runs on the original index space.
+
+Alternatively, we could look for one-shot generators, which took the whole key as a seed input,
+and yielded one-shot values with appropriate statistical properites.
+
+Consider the paper:
+
+* http://www.thesalmons.org/john/random123/papers/random123sc11.pdf
+
+We'll need a solution to this problem space.
+
 ## Summarizing Rewrites Observations
 
-Even under index space projection restrictions, we appear to be able to rewrite a large family 
+Even under index space projection restrictions, we appear to be able to rewrite a large family
 of operations:
 
 * region mappings and matmuls (inc: Linear, Conv, ReLU)
 * reductions (inc: Sum, Stddev, Avg)
 
-This collection of operations *appears* sufficient to embed most AI/ML applications; so we we 
+This collection of operations *appears* sufficient to embed most AI/ML applications; so we we
 can pivot:
 
 * from asking "are these operations embeddable?"
@@ -372,36 +436,38 @@ Examining the abstract embeddings considered thus far, we can make a number of o
 graph components needed.
 
 * Tensor Transpose/Slice/Merge Nodes
-  * Leaf operations consume and produce *slices* of their input and output tensor spaces; 
-    and rewrites of the leaf operations are accompanied by rewrites of their index spaces,
-    but also the slices they operate on. It will be necessary to expose slice operations
-    at the graph transformation layer.
+    * Leaf operations consume and produce *slices* of their input and output tensor spaces;
+      and rewrites of the leaf operations are accompanied by rewrites of their index spaces,
+      but also the slices they operate on. It will be necessary to expose slice operations
+      at the graph transformation layer.
 * Index Projection Functions
-  * Projection from leaf index spaces to tensor block regions requires some projection/slice 
-    function to specify operation regions. A few properties we know we'll need:
-    * Coherent projections - as the leaf operations are block operations, projections to 
-      neighboring cells in index space should yield coherent/contiguous selections in the target 
-      tensors.
-    * Transformable - there are rewrites we'd like to be able to describe deterministically which
-      alter the index projection of the rewritten nodes; so it's valuable if we can transform
-      those projection functions under rewrites.
-    * overlapping input projections - as we wish to model convolutions, our projection machinery, 
-      and concept of "coherent" should model overlapping neighbor selection regions.
-    * non-overlapping, coherent outputs - for *output* tensors, we'd like to be able to assert 
-      that projections don't produce overlapping regions, and fully fill a target space.
+    * Projection from leaf index spaces to tensor block regions requires some projection/slice
+      function to specify operation regions. A few properties we know we'll need:
+        * Coherent projections - as the leaf operations are block operations, projections to
+          neighboring cells in index space should yield coherent/contiguous selections in the target
+          tensors.
+        * Transformable - there are rewrites we'd like to be able to describe deterministically
+          which
+          alter the index projection of the rewritten nodes; so it's valuable if we can transform
+          those projection functions under rewrites.
+        * overlapping input projections - as we wish to model convolutions, our projection
+          machinery,
+          and concept of "coherent" should model overlapping neighbor selection regions.
+        * non-overlapping, coherent outputs - for *output* tensors, we'd like to be able to assert
+          that projections don't produce overlapping regions, and fully fill a target space.
 
-Tensor transposition and slicing is extensively described; it's easy to reuse existing machinery 
-to describe transformations to map one set of tensor indexes to another; our primary goal is to 
-be able to analyze and re-write those transformations. If we are only interested in 
-subdividing work, then we can always append further transpose/slice operations on existing view 
+Tensor transposition and slicing is extensively described; it's easy to reuse existing machinery
+to describe transformations to map one set of tensor indexes to another; our primary goal is to
+be able to analyze and re-write those transformations. If we are only interested in
+subdividing work, then we can always append further transpose/slice operations on existing view
 stacks.
 
-So we can model tensor view operations as index mapping stacks, each producing a "new" tensor, 
+So we can model tensor view operations as index mapping stacks, each producing a "new" tensor,
 where the intermediate tensors may never be reified.
 
-Index projection is a more complicated case, we're not building 1:1 mapping between cell index 
-locations, but describing regions, and we need a mechanic which permits this, we need a 
-mechanism to check that this projection is valid (to prevent bad operations in the graph, and 
+Index projection is a more complicated case, we're not building 1:1 mapping between cell index
+locations, but describing regions, and we need a mechanic which permits this, we need a
+mechanism to check that this projection is valid (to prevent bad operations in the graph, and
 guard against bad re-writes), and we need a way to rewrite it.
 
 
