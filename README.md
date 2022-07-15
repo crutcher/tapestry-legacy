@@ -412,7 +412,7 @@ of coherent runs on the original index space.
 Alternatively, we could look for one-shot generators, which took the whole key as a seed input,
 and yielded one-shot values with appropriate statistical properites.
 
-Consider the paper:
+Consider this paper on parallel random number generators, which may provide closed-form answers:
 
 * http://www.thesalmons.org/john/random123/papers/random123sc11.pdf
 
