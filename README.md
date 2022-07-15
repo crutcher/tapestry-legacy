@@ -410,7 +410,7 @@ We could potentially save some computation by examination of the selected region
 of coherent runs on the original index space.
 
 Alternatively, we could look for one-shot generators, which took the whole key as a seed input,
-and yielded one-shot values with appropriate statistical properites.
+and yielded one-shot values with appropriate statistical properties.
 
 Consider this paper on parallel random number generators, which may provide closed-form answers:
 
@@ -455,6 +455,8 @@ graph components needed.
           and concept of "coherent" should model overlapping neighbor selection regions.
         * non-overlapping, coherent outputs - for *output* tensors, we'd like to be able to assert
           that projections don't produce overlapping regions, and fully fill a target space.
+* Tensor Generators
+  * Some stable solution to rand will be needed.
 
 Tensor transposition and slicing is extensively described; it's easy to reuse existing machinery
 to describe transformations to map one set of tensor indexes to another; our primary goal is to
