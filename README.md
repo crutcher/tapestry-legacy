@@ -1,6 +1,6 @@
 # Tapestry
 
-crutcher@gmail.com, crutcher@meta.com
+crutcher@meta.com, crutcher@gmail.com
 
 ## Abstract
 
