@@ -481,3 +481,123 @@ mechanism to check that this projection is valid (to prevent bad operations in t
 guard against bad re-writes), and we need a way to rewrite it.
 
 
+## Index Projection Functions
+
+In seeking index projection functions, we need to establish a mapping from every point in the
+abstract index space for an operation, to some coherent region in an associated input or output
+tensor.
+
+Two notable points:
+
+* The coherent region comes from the design constrant that neighoring points in index space should
+  map to coherent blocks of the associated tensors.
+
+* We'll further restrict selection to cubic regions: points, rectangles, blocks, etc.
+
+* We'll further assume that the selected regions are not empty; our projection need not generate
+  regions with zero (or negative) contained cells.
+
+* We'll additionally require that all projections for the same function produce regions of the
+  same shape; we're targeting block operations anyway.
+
+* To further simplify this problem, we'll make the assumption that the index projection will not
+  change any aspect of the tensor's stride: dimensionality, dimension ordering, and dimension
+  direction will not change under projection. We're just selecting a region in an existing layout.
+
+To define a coherent, non-empty cubic region in a tensor space, we could:
+
+* Specify an inclusive (the point is inside the region) *start* and an exclusive (the point is
+  outside the region) *end* point.
+* Specify an inclusive *start* and an inclusive *end* point.
+* Specify an inclusive *start* and a shape.
+* Specify all inclusive corners of the region.
+
+Each of these representations is equivalent, but Projecting to a dynamic *start* point, with a
+fixed *shape* is simpler to specify, and does not require the well-formedness checks of the
+other mechanics, so we'll use (*start*, *shape*) to describe the output of a projection.
+
+To map a point in one integer coordinate space to a point in another integer coordinate space,
+an integer affine transform is a good place to start.
+
+Let's consider an index projection composed of:
+
+* *projection* - an integer projection matrix
+* *offset* - an integer offset vector (it moves the *start* location)
+* *shape* - an integer region shape
+
+Let's call this approach ZProjection; is this sufficent?
+
+### Exploring ZProjections: Fixed Tensor Inputs
+
+For a number of operations explored above (*nn.Linear*, *nn.Conv*), while we sharded along
+the dimensions of some tensors, others were consumed in full, not varying at different points
+in index space.
+
+We can use a ZProjection to project to fixed views using by:
+
+* setting the *projection* to a zero matrix,
+* the *offset* to the origin of the view,
+* and the *shape* to the shape of the view.
+
+As a result, all points in index space will map to the same fixed input view.
+
+### Exploring ZProjections: nn.Linear Strides
+
+*nn.Linear* and *matmul* stride one-at-a-time along their input and output tensors, the
+shape of the selected regions is generally a one vector.
+
+* setting the *projection* to map adjacent cells,
+* the *offset* to a zero vector,
+* and the *shape* to a a one vector.
+
+Again, we have a stable stride.
+
+### Exploring ZProjections: negative nn.Linear Strides
+
+Given that we're working with projections, there's no particular reason we can't define
+a projection which counts *backwards* as index space increments.
+
+### Exploring ZProjections: axial reduce (nn.Sum)
+
+Reducing all the values along a given dimension can be accomplished by:
+
+* setting *projection* to map the first cell in that dimension,
+* setting *offset* to a zero vector,
+* and *shape* to the shape of that axial row (all ones, except for one dimension matching
+  the length).
+
+### Exploring ZProjections: nn.Conv Kernel Window Strides
+
+*nn.Conv* and convolution algorithms generally need to describe a kernel window region
+centered upon some notional location.
+
+* setting *projection* to map the "center" cell in the region,
+* setting *offset* to adjust the location of the *start* cell,
+* and *shape* to the shape of the selected region.
+
+
+### Exploring ZProjections: Padding, nn.Conv, and Negative Indexes
+
+Suppose we are targeting a 3x3 kernel with *nn.Conv*, and we say that:
+
+* *projection* is a diagonal identity matrix (`[[1, 0], [0, 1]]`),
+* *offset* is `[-1, -1]`,
+* and *shape* `[3, 3]`
+
+At the origin `[0, 0]`; this will give us a negative offset; what does this mean?
+
+We can make a similar case for *nn.Conv* windows at the end of a dimension,
+where the shape can yield positive values which still lie outside of the tensor
+coordinates.
+
+How, in general, do we handle out-of-bounds index points in a ZProjection?
+
+We could:
+
+* forbid out-of-bounds indexes,
+* treat index space as torroidal (it wraps around),
+* treat negative indexs whose absolute value is less than the dimension as counting
+  "backwards" from the end (this is what *numpy* does),
+* treat the infinite space "around" our tensor as some form of pad-space
+  (and define an approach to handling padding).
+
