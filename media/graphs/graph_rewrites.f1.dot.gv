@@ -1,0 +1,237 @@
+digraph G {
+  rankdir=LR;
+
+  subgraph cluster_0 {
+    x_0 [
+      label="X",
+      shape=rectangle,
+    ];
+    y_0 [
+      label="Y",
+      shape=rectangle,
+      style="dotted",
+    ];
+    z_0 [
+      label="Z",
+      shape=rectangle,
+    ];
+    opA_0 [
+      label="A",
+      shape=rarrow,
+      style=filled,
+      fillcolor="#E5E8E8",
+      margin=0.3
+    ];
+    opB_0 [
+      label="B",
+      shape=rarrow,
+      style=filled,
+      fillcolor="#E5E8E8",
+      margin=0.3
+    ];
+
+    x_0 -> opA_0;
+    opA_0 -> y_0;
+    y_0 -> opB_0;
+    opB_0 -> z_0;
+  }
+
+  subgraph cluster_1 {
+    label="graph rewrite equations";
+    graph [style=dashed];
+
+    subgraph cluster_1expand{
+      label="Expand A: (in, A, out) -> (in, J, {tmp}, K, out)";
+      graph [style=dashed];
+
+    subgraph cluster_1a {
+      label="";
+      graph [style=dotted];
+
+      in_1a [
+        label="{in}",
+        shape=rectangle,
+      ];
+      out_1a [
+        label="{out}",
+        shape=rectangle,
+      ];
+      opA_1a [
+        label="A",
+        shape=rarrow,
+        style=filled,
+        fillcolor="#E5E8E8",
+        margin=0.3
+      ];
+
+      in_1a -> opA_1a;
+      opA_1a -> out_1a;
+    }
+
+    subgraph cluster_1b {
+      label="";
+      graph [style=dotted];
+
+      in_1b [
+        label="{in}",
+        shape=rectangle,
+      ];
+      out_1b [
+        label="{out}",
+        shape=rectangle,
+      ];
+      inter_1b [
+        label="{inter}",
+        shape=rectangle,
+      ];
+      opJ_1b [
+        label="J",
+        shape=rarrow,
+        style=filled,
+        fillcolor="#E5E8E8",
+        margin=0.3
+      ];
+
+      opK_1b [
+        label="K",
+        shape=rarrow,
+        style=filled,
+        fillcolor="#E5E8E8",
+        margin=0.3
+      ];
+
+      in_1b -> opJ_1b;
+      opJ_1b -> inter_1b;
+      inter_1b -> opK_1b;
+      opK_1b -> out_1b;
+
+    }
+
+    out_1a -> in_1b [
+      ltail=cluster_1a,
+      lhead=cluster_1b,
+      color = "black:invis:black",
+      arrowsize=3,
+      arrowhead=empty,
+    ];
+    }
+
+    subgraph cluster_afuse{
+      label="Fuse J, K: (in, J, {tmp}, K, out) -> (in, H, out)";
+      graph [style=dashed];
+
+    subgraph cluster_1c {
+      label="";
+      graph [style=dotted];
+
+      in_1c [
+        label="{in}",
+        shape=rectangle,
+      ];
+      out_1c [
+        label="{out}",
+        shape=rectangle,
+      ];
+      inter_1c [
+        label="{inter}",
+        shape=rectangle,
+      ];
+      opJ_1c [
+        label="K",
+        shape=rarrow,
+        style=filled,
+        fillcolor="#E5E8E8",
+        margin=0.3
+      ];
+
+      opK_1c [
+        label="B",
+        shape=rarrow,
+        style=filled,
+        fillcolor="#E5E8E8",
+        margin=0.3
+      ];
+
+      in_1c -> opJ_1c;
+      opJ_1c -> inter_1c;
+      inter_1c -> opK_1c;
+      opK_1c -> out_1c;
+    }
+
+    subgraph cluster_1d {
+      label="";
+      graph [style=dotted];
+
+      in_1d [
+        label="{in}",
+        shape=rectangle,
+      ];
+      out_1d [
+        label="{out}",
+        shape=rectangle,
+      ];
+      opA_1d [
+        label="H",
+        shape=rarrow,
+        style=filled,
+        fillcolor="#E5E8E8",
+        margin=0.3
+      ];
+
+      in_1d -> opA_1d;
+      opA_1d -> out_1d;
+    }
+
+    out_1c -> in_1d [
+      ltail=cluster_0,
+      lhead=cluster_1,
+      color = "black:invis:black",
+      arrowsize=3,
+      arrowhead=empty,
+    ];
+    }
+  }
+
+  subgraph cluster_2 {
+    x_2 [
+      label="X",
+      shape=rectangle,
+    ];
+    y_2 [
+      label="inter_0",
+      shape=rectangle,
+      style="dotted",
+    ];
+    z_2 [
+      label="Z",
+      shape=rectangle,
+    ];
+    opA_2 [
+      label="J",
+      shape=rarrow,
+      style=filled,
+      fillcolor="#E5E8E8",
+      margin=0.3
+    ];
+    opB_2 [
+      label="H",
+      shape=rarrow,
+      style=filled,
+      fillcolor="#E5E8E8",
+      margin=0.3
+    ];
+
+    x_2 -> opA_2;
+    opA_2 -> y_2;
+    y_2 -> opB_2;
+    opB_2 -> z_2;
+  }
+
+  y_0 -> y_2 [
+    ltail=cluster_0,
+    lhead=cluster_2,
+    arrowsize=3,
+    arrowhead=empty,
+    color = "black:invis:black",
+  ];
+}

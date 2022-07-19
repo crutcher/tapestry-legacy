@@ -4,13 +4,21 @@ crutcher@gmail.com, crutcher@meta.com
 
 ## Abstract
 
-Tapestry is a project to prototype "Spark, for GPU Accelerated AI/ML Tensor Algorithms".
+Tapestry is a project to prototype a rewriting and scheduling framework for dense block tensor 
+graph expressions; "Spark, for GPU Accelerated AI/ML Tensor Algorithms".
+
+## Supplemental Documents
+
+* [Graph Rewrites](GraphRewrites.md)  
+  Describes the general problem of incremental lowering via graph rewriting.
+
+## Background
 
 There would be significant value in divorcing the development of tensor applications from the
 scheduling and efficient execution of those applications. One problem requires specialized training
-in statistics,
-machine learning, physics, or some other branch of math that cares about tensors; the other requires
-specialized training in scheduling theory, distributed system engineering, and compiler design.
+in statistics, machine learning, physics, or some other branch of math that cares about tensors;
+the other requires specialized training in scheduling theory, distributed system engineering,
+and compiler design.
 
 Exiting dataflow environments are already
 [embarrassingly parallel](https://en.wikipedia.org/wiki/Embarrassingly_parallel), able to
