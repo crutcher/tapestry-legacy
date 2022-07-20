@@ -4,7 +4,7 @@ crutcher@meta.com, crutcher@gmail.com
 
 ## Abstract
 
-Tapestry is a project to prototype a rewriting and scheduling framework for dense block tensor 
+Tapestry is a project to prototype a rewriting and scheduling framework for dense block tensor
 graph expressions; "Spark, for GPU Accelerated AI/ML Tensor Algorithms".
 
 ## Supplemental Documents
@@ -464,7 +464,7 @@ graph components needed.
         * non-overlapping, coherent outputs - for *output* tensors, we'd like to be able to assert
           that projections don't produce overlapping regions, and fully fill a target space.
 * Tensor Generators
-  * Some stable solution to rand will be needed.
+    * Some stable solution to rand will be needed.
 
 Tensor transposition and slicing is extensively described; it's easy to reuse existing machinery
 to describe transformations to map one set of tensor indexes to another; our primary goal is to
@@ -479,7 +479,6 @@ Index projection is a more complicated case, we're not building 1:1 mapping betw
 locations, but describing regions, and we need a mechanic which permits this, we need a
 mechanism to check that this projection is valid (to prevent bad operations in the graph, and
 guard against bad re-writes), and we need a way to rewrite it.
-
 
 ## Index Projection Functions
 
@@ -504,13 +503,15 @@ Two notable points:
   change any aspect of the tensor's stride: dimensionality, dimension ordering, and dimension
   direction will not change under projection. We're just selecting a region in an existing layout.
 
-To define a coherent, non-empty cubic region in a tensor space, we could:
+To define a coherent, non-empty cubic region of constant shape in an integer coordinate system,
+we could:
 
 * Specify an inclusive (the point is inside the region) *start* and an exclusive (the point is
   outside the region) *end* point.
 * Specify an inclusive *start* and an inclusive *end* point.
 * Specify an inclusive *start* and a shape.
-* Specify all inclusive corners of the region.
+* Specify all of the corners of the region.
+* etc ...
 
 Each of these representations is equivalent, but Projecting to a dynamic *start* point, with a
 fixed *shape* is simpler to specify, and does not require the well-formedness checks of the
@@ -525,7 +526,7 @@ Let's consider an index projection composed of:
 * *offset* - an integer offset vector (it moves the *start* location)
 * *shape* - an integer region shape
 
-Let's call this approach ZProjection; is this sufficent?
+Let's call this approach ZProjection; is this sufficient?
 
 ### Exploring ZProjections: Fixed Tensor Inputs
 
@@ -541,6 +542,13 @@ We can use a ZProjection to project to fixed views using by:
 
 As a result, all points in index space will map to the same fixed input view.
 
+![zprojection.fixed.f1](media/graphs/zprojection.fixed.f1.dot.png)
+
+We can also trivially select a sub-region of the original tensor for fixed reads,
+by adjusting *offset* and *shape*:
+
+![zprojection.fixed.f2](media/graphs/zprojection.fixed.f2.dot.png)
+
 ### Exploring ZProjections: nn.Linear Strides
 
 *nn.Linear* and *matmul* stride one-at-a-time along their input and output tensors, the
@@ -548,14 +556,22 @@ shape of the selected regions is generally a one vector.
 
 * setting the *projection* to map adjacent cells,
 * the *offset* to a zero vector,
-* and the *shape* to a a one vector.
+* and the *shape* to a one vector.
 
 Again, we have a stable stride.
+
+![zprojection.linear.f1](media/graphs/zprojection.linear.f1.dot.png)
 
 ### Exploring ZProjections: negative nn.Linear Strides
 
 Given that we're working with projections, there's no particular reason we can't define
 a projection which counts *backwards* as index space increments.
+
+However, when we consider dense blocks, and what it means for them to be coherent;
+it is important to consider that a *subsequent* block along some dimension may
+map to a *preceding* location in the target coordinate space.
+
+![zprojection.linear.f2](media/graphs/zprojection.linear.f2.dot.png)
 
 ### Exploring ZProjections: axial reduce (nn.Sum)
 
@@ -571,33 +587,39 @@ Reducing all the values along a given dimension can be accomplished by:
 *nn.Conv* and convolution algorithms generally need to describe a kernel window region
 centered upon some notional location.
 
+We can start defining windows by:
+
 * setting *projection* to map the "center" cell in the region,
 * setting *offset* to adjust the location of the *start* cell,
 * and *shape* to the shape of the selected region.
 
+![zprojection.conv.f1](media/graphs/zprojection.conv.f1.dot.png)
 
-### Exploring ZProjections: Padding, nn.Conv, and Negative Indexes
+Our first mapped point produces a kernel which crosses the bounds of the space;
+and we can see we'll see similar bounds crossing along all borders of the space
+with this offset design; so we have to address the question:
 
-Suppose we are targeting a 3x3 kernel with *nn.Conv*, and we say that:
-
-* *projection* is a diagonal identity matrix (`[[1, 0], [0, 1]]`),
-* *offset* is `[-1, -1]`,
-* and *shape* `[3, 3]`
-
-At the origin `[0, 0]`; this will give us a negative offset; what does this mean?
-
-We can make a similar case for *nn.Conv* windows at the end of a dimension,
-where the shape can yield positive values which still lie outside of the tensor
-coordinates.
-
-How, in general, do we handle out-of-bounds index points in a ZProjection?
+* How we handle out-of-bounds indexes?
 
 We could:
 
 * forbid out-of-bounds indexes,
-* treat index space as torroidal (it wraps around),
-* treat negative indexs whose absolute value is less than the dimension as counting
+* treat index space as toroidal (it wraps around),
+* treat negative indexes whose absolute value is less than the dimension as counting
   "backwards" from the end (this is what *numpy* does),
 * treat the infinite space "around" our tensor as some form of pad-space
   (and define an approach to handling padding).
 
+#### Offset is composite: projection offset + relative start offset
+
+There's an additional problem with using *offset* to describe windows walking over
+negative projection dimensions; which is that we're using *offset* to describe two things:
+
+* the relative location of the start point from the mapped point,
+* the bounds adjustment needed for negative indexing.
+
+This has no impact when computing projections, but may affect authoring them (working in terms
+of relative offsets may be easier), and in mechanically computing stride order changes (the
+relative start would need to be recovered before reversing a negative dimension).
+
+TODO: diagram

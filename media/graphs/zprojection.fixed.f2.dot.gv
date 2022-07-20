@@ -1,0 +1,114 @@
+digraph G {
+  rankdir=LR;
+  compound=true;
+
+  subgraph cluster_zproj {
+  proj [
+    shape="plain",
+    label=<
+        <table border="0">
+    <tr><td>
+      <table bgcolor="#D6EAF8" cellpadding="8">
+        <tr>
+          <td>0</td>
+          <td>0</td>
+          </tr>
+        <tr>
+          <td>0</td>
+          <td>0</td>
+          </tr>
+        </table>
+          </td></tr>
+    <tr><td><i>projection</i></td></tr>
+          </table>
+    >,
+  ];
+
+  offset [
+    shape="plain",
+    label=<
+        <table border="0">
+    <tr><td>
+      <table bgcolor="#D6EAF8" cellpadding="8">
+        <tr>
+          <td>1</td>
+          <td>1</td>
+          </tr>
+        </table>
+          </td></tr>
+    <tr><td><i>offset</i></td></tr>
+          </table>
+    >,
+  ];
+
+  rshape [
+    shape="plain",
+    label=<
+        <table border="0">
+    <tr><td>
+      <table bgcolor="#D6EAF8" cellpadding="8">
+        <tr>
+          <td>2</td>
+          <td>2</td>
+          </tr>
+        </table>
+          </td></tr>
+    <tr><td><i>shape</i></td></tr>
+          </table>
+    >,
+  ];
+
+  }
+
+  W [
+      shape="plain",
+      label=<
+      <table cellpadding="8">
+          <tr>
+              <td>w<sub>0,0</sub></td>
+              <td>w<sub>0,1</sub></td>
+              <td>w<sub>0,2</sub></td>
+              </tr>
+          <tr>
+              <td>w<sub>1,0</sub></td>
+              <td bgcolor="#D5F5E3">w<sub>1,1</sub></td>
+              <td bgcolor="#D5F5E3">w<sub>1,2</sub></td>
+              </tr>
+          <tr>
+              <td>w<sub>2,0</sub></td>
+              <td bgcolor="#D5F5E3">w<sub>2,1</sub></td>
+              <td bgcolor="#D5F5E3">w<sub>2,2</sub></td>
+              </tr>
+          <tr>
+              <td>w<sub>3,0</sub></td>
+              <td>w<sub>3,1</sub></td>
+              <td>w<sub>3,2</sub></td>
+              </tr>
+          </table>
+      >,
+  ];
+
+  idx [
+    shape="plain",
+    label=<
+        <table border="0">
+    <tr><td>
+      <table cellpadding="8">
+        <tr>
+          <td bgcolor="#EBDEF0">i,n</td>
+          <td>⋰</td>
+          </tr>
+        <tr>
+          <td>⋰</td>
+          <td>⋱</td>
+          </tr>
+        </table>
+          </td></tr>
+    <tr><td><i>index</i></td></tr>
+          </table>
+    >,
+  ];
+
+  idx -> offset [lhead=cluster_zproj];
+  offset -> W [ltail=cluster_zproj];
+}
