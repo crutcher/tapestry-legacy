@@ -157,6 +157,37 @@ as not.
 
 It's worth calling out as future work, but we'll defer modeling this for now.
 
+## Incremental Delta Strides are Constant
+
+Since affine projections (including integer affine projections) are linear maps,
+the incremental stride along one dimension of index space will be a constant vector
+across the entire index space.
+
+    ΔZP/Δi = ZP([.., c(i) + 1, ...]T) - ZP([.., c(i), ...]T)
+           = ([.., c(i) + 1, ...]T*P + Offset) - ([.., c(i), ...]T*P + Offset)
+           = [.., c(i) + 1, ...]T*P [.., c(i), ...]T*P + Offset - Offset
+           = [.., c(i) + 1, ...]T*P - [.., c(i), ...]T*P
+           = [c(0) - c(0), .., c(i) + 1 - c(i), ...]T*P
+           = [0, .., 1 (@i), ..., 0]T*P
+
+We can use this fact to conclude that:
+
+* Coherent blocks in the index space coordinate system will map to coherent blocks in the target
+  tensor coordinate systems.
+
+## Incremental Tensor Sharing is Constant
+
+Since we know that incremental strides are constant, when examining tensor data sharing between
+work units, we can compute the incremental block overlap between tensors, which shows the degree
+of data sharing along an index axis.
+
+For fixed view tensors, the overlap is total; and for standard linear maps, the overlap is zero;
+for many convolution algorithms, there is partial overlap along some index dimensions (those of
+the convolution kernel window), and no overlap along others (the batch dimension, or a channel
+dimension).
+
+Effective sharding depends on being able to predict marginal costs along sharding dimensions.
+
 ## Next
 
 * [Table of Contents](README.md)
