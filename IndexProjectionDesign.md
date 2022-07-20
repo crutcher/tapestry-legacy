@@ -163,11 +163,13 @@ Since affine projections (including integer affine projections) are linear maps,
 the incremental stride along one dimension of index space will be a constant vector
 across the entire index space.
 
+    ZP(C) = C.T P + Offset
+
     ΔZP/Δi = ZP(C + [0, ..., 1 @i, ..., 0]) - ZP(C)
-           = (C + [0, ..., 1 @i, ..., 0]) P + Offset - C P - Offset
-           = (C + [0, ..., 1 @i, ..., 0]) P - C P
-           = (C + [0, ..., 1 @i, ..., 0] - C) P
-           = [0, ..., 1 @i, ..., 0] P
+           = (C + [0, ..., 1 @i, ..., 0]).T P + Offset - C P - Offset
+           = (C + [0, ..., 1 @i, ..., 0]).T P - C P
+           = (C + [0, ..., 1 @i, ..., 0] - C).T P
+           = [0, ..., 1 @i, ..., 0].T P
 
 We can use this fact to conclude that:
 
