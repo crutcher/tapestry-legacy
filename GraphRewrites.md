@@ -1,5 +1,7 @@
 # Graph Rewrites
 
+* [Table of Contents](README.md)
+
 Graph rewrites are critical to compiler development and schedule optimization.
 
 We are interested in mechanisms which take an input graph *G*, and produce an output graph *G'*,
@@ -148,3 +150,7 @@ beneficial to do so; and where a non-deterministic rewrite is required, it's usu
 refactor that into multiple stages such that the non-deterministic rewrite set is as small as 
 possible.
 
+## Next
+
+* [Table of Contents](README.md)
+* [Next](ApiDesign.md)
