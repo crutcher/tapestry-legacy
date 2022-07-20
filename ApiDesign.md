@@ -88,4 +88,4 @@ programs.*
 ## Next
 
 * [Table of Contents](README.md)
-* [Next](ExploringTensorBlockShardingFeasibility.md)
+* [Next](BlockSharding.md)

@@ -1,7 +1,7 @@
 # Index Projection Functions
 
 * [Table of Contents](README.md)
-* [Previous](ExploringTensorBlockShardingFeasibility.md)
+* [Previous](BlockSharding.md)
 
 In seeking index projection functions, we need to establish a mapping from every point in the
 abstract index space for an operation, to some coherent region in an associated input or output

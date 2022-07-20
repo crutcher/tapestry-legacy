@@ -81,7 +81,7 @@ There are 4 primary components needed to demonstrate this:
   Describes the general problem of incremental lowering via graph rewriting.
 * [API Design Overview](ApiDesign.md)  
   Gives an overview on design goals for a usable API.
-* [Exploring Tensor Block Sharding Feasibility](ExploringTensorBlockShardingFeasibility.md)  
+* [Exploring Tensor Block Sharding Feasibility](BlockSharding.md)  
   Explores common tensor block algorithms, and feasibility on extracting sharding patterns.
 * [Index Projection Design](IndexProjectionDesign.md)  
   Derives an index projection function design from index tensor block sharding exploration.
