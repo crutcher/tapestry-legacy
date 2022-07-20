@@ -45,6 +45,16 @@ extensions to the dataflow graph execution model (Parallel Collections + Paralle
 permit fine-grained description of the covariance between tensor spatial locality and CUDA kernel
 time locality in operations.
 
+If we can describe the tensor block operations in a tensor operation graph in a way which
+permits mechanical sharding decisions, we can rewrite bulk abstract operation graphs into
+smaller operations in mechanical ways which preserve their semantics.
+
+If we have an execution cost model for tensor block operation graphs, and can describe the marginal
+data sharing and compute costs of different choices of block split, we can search for graph
+rewrites which fit target constraints (no more than 40 machines), or optimize target goals
+(minimal wallclock time, or minimal power) by casting the block split / scheduling problem as a
+multidimensional resource scheduling problem.
+
 There are 4 primary components needed to demonstrate this:
 
 * a demonstration that AI/ML algorithms can fit in dataflow languages at all,
