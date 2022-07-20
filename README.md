@@ -19,6 +19,12 @@ resources:
 The approach is fine-grained modeling of marginal sharding at the block operation level, 
 enabling aggressive semantics preserving graph rewrites.
 
+## Discussion
+
+Please direct questions to the github issues for this project: 
+
+* [tapestry issues](https://github.com/crutcher/tapestry/issues)
+
 ## Background
 
 There would be significant value in divorcing the development of tensor applications from the
