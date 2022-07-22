@@ -188,7 +188,7 @@ index space block; but with negative strides our bounds are different.
 ## Coherent Blocks May Be Sparse
 
 Our guarantees about coherence of layout, and block mapping union, guarantee that the mapped 
-block is layed out the same as the source block, but not that it is all used.
+block is laid out the same as the source block, but not that it is all used.
 
 We may describe strides which skip data; the zprojection mechanism will include the unused 
 interspacing data in the fused block, and has no mechanism for avoiding this *at this layer*.
