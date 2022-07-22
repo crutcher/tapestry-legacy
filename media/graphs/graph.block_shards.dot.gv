@@ -1,0 +1,116 @@
+digraph G {
+  rankdir=LR;
+  label="Block Operation Graph";
+
+  X [
+    label=<
+      <table border="0" align="left">
+        <tr><td align="left"><u>Tensor: X</u></td></tr>
+        <tr><td align="left">id</td></tr>
+        <tr><td align="left">dtype</td></tr>
+        <tr><td align="left">shape</td></tr>
+        </table>
+    >,
+    shape="box3d",
+    style=filled,
+    fillcolor="#D6EAF8",
+  ];
+
+  W [
+    label=<
+      <table border="0" align="left">
+        <tr><td align="left"><u>Tensor: W</u></td></tr>
+        <tr><td align="left">id</td></tr>
+        <tr><td align="left">dtype</td></tr>
+        <tr><td align="left">shape</td></tr>
+        </table>
+    >,
+    shape="box3d",
+    style=filled,
+    fillcolor="#D6EAF8",
+  ];
+
+  Z [
+    label=<
+      <table border="0" align="left">
+        <tr><td align="left"><u>Tensor: Z</u></td></tr>
+        <tr><td align="left">id</td></tr>
+        <tr><td align="left">dtype</td></tr>
+        <tr><td align="left">shape</td></tr>
+        </table>
+    >,
+    shape="box3d",
+    style=filled,
+    fillcolor="#D6EAF8",
+  ];
+
+  Y [
+    label=<
+      <table border="0" align="left">
+        <tr><td align="left"><u>Tensor: Y</u></td></tr>
+        <tr><td align="left">id</td></tr>
+        <tr><td align="left">dtype</td></tr>
+        <tr><td align="left">shape</td></tr>
+        </table>
+    >,
+    shape="box3d",
+    style=filled,
+    fillcolor="#D6EAF8",
+  ];
+
+  BlockOpA [
+    label=<
+      <table border="0" align="left">
+        <tr><td align="left"><u>BlockOp: A</u></td></tr>
+        <tr><td align="left">id</td></tr>
+        <tr><td port="operation" align="left">operation_id</td></tr>
+        <tr><td align="left">index_space</td></tr>
+        <tr><td align="left">projection_maps</td></tr>
+        </table>
+    >,
+    shape="rarrow",
+    style=filled,
+    fillcolor="#E5E8E8",
+    margin="0.2",
+  ];
+
+  BlockShard [
+    label=<
+      <table border="0" align="left">
+        <tr><td align="left"><u>BlockShard: A[i]</u></td></tr>
+        <tr><td align="left">id</td></tr>
+        <tr><td align="left">index_slice</td></tr>
+        <tr><td align="left">tensor_slice_map</td></tr>
+        </table>
+    >,
+    shape="component",
+    style="filled",
+    fillcolor="#B0F0F0",
+  ];
+
+  X -> BlockOpA;
+  W -> BlockOpA;
+  BlockOpA -> Y;
+  BlockOpA -> Z;
+
+  X -> BlockShard [style="dotted"];
+  W -> BlockShard [style="dotted"];
+
+  BlockOpA -> BlockShard;
+  { rank=same; BlockOpA; BlockShard; }
+
+  Source [
+    shape="doubleoctagon",
+    style="filled",
+    fillcolor="#B0E0B0",
+  ];
+  Source -> X;
+  Source -> W;
+
+  Sink [
+    shape="doubleoctagon",
+    style="filled",
+    fillcolor="#B0E0B0",
+  ];
+  Y -> Sink;
+}

@@ -1,0 +1,313 @@
+digraph G {
+  rankdir=LR;
+  label="Tensor Block Operation Graph";
+
+  subgraph cluster_X {
+    label="";
+  X [
+    label=<
+      <table border="0" align="left">
+        <tr><td align="left"><u>Tensor: X</u></td></tr>
+        <tr><td align="left">id</td></tr>
+        <tr><td align="left">dtype</td></tr>
+        <tr><td align="left">shape</td></tr>
+        </table>
+    >,
+    shape="box3d",
+    style=filled,
+    fillcolor="#D6EAF8",
+  ];
+
+  XChunk [
+    label=<
+      <table border="0" align="left">
+        <tr><td align="left"><u>TensorChunk: X[i]</u></td></tr>
+        <tr><td align="left">slice</td></tr>
+        </table>
+    >,
+    shape="box3d",
+    style=filled,
+    fillcolor="#B6CAE8",
+  ];
+  X -> XChunk [style="dashed"];
+  { rank=same; X; XChunk; }
+  } // subgraph cluster_X
+
+  m [
+    label=<
+      <table border="0" align="left">
+        <tr><td align="left"><u>TensorView: m</u></td></tr>
+        <tr><td align="left">id</td></tr>
+        <tr><td align="left">concat_dim</td></tr>
+        <tr><td align="left">view</td></tr>
+        </table>
+    >,
+    shape="box3d",
+    style=filled,
+    fillcolor="#EBDEF0",
+  ];
+
+
+  subgraph cluster_W {
+    label="";
+  W [
+    label=<
+      <table border="0" align="left">
+        <tr><td align="left"><u>Tensor: W</u></td></tr>
+        <tr><td align="left">id</td></tr>
+        <tr><td align="left">dtype</td></tr>
+        <tr><td align="left">shape</td></tr>
+        </table>
+    >,
+    shape="box3d",
+    style=filled,
+    fillcolor="#D6EAF8",
+  ];
+  WChunk [
+    label=<
+      <table border="0" align="left">
+        <tr><td align="left"><u>TensorChunk: W[i]</u></td></tr>
+        <tr><td align="left">slice</td></tr>
+        </table>
+    >,
+    shape="box3d",
+    style=filled,
+    fillcolor="#B6CAE8",
+  ];
+  W -> WChunk [style="dashed"];
+  { rank=same; W; WChunk; }
+  } // subgraph cluster_W
+
+  subgraph cluster_Z {
+    label="";
+  Z [
+    label=<
+      <table border="0" align="left">
+        <tr><td align="left"><u>Tensor: Z</u></td></tr>
+        <tr><td align="left">id</td></tr>
+        <tr><td align="left">dtype</td></tr>
+        <tr><td align="left">shape</td></tr>
+        </table>
+    >,
+    shape="box3d",
+    style=filled,
+    fillcolor="#D6EAF8",
+  ];
+  ZChunk [
+    label=<
+      <table border="0" align="left">
+        <tr><td align="left"><u>TensorChunk: Z[i]</u></td></tr>
+        <tr><td align="left">slice</td></tr>
+        </table>
+    >,
+    shape="box3d",
+    style=filled,
+    fillcolor="#B6CAE8",
+  ];
+  Z -> ZChunk [style="dashed"];
+  { rank=same; Z; ZChunk; }
+  } // subgraph cluster_Z
+
+
+  subgraph cluster_K {
+    label="";
+  K [
+    label=<
+      <table border="0" align="left">
+        <tr><td align="left"><u>Tensor: K</u></td></tr>
+        <tr><td align="left">id</td></tr>
+        <tr><td align="left">dtype</td></tr>
+        <tr><td align="left">shape</td></tr>
+        </table>
+    >,
+    shape="box3d",
+    style=filled,
+    fillcolor="#D6EAF8",
+  ];
+  KChunk [
+    label=<
+      <table border="0" align="left">
+        <tr><td align="left"><u>TensorChunk: K[i]</u></td></tr>
+        <tr><td align="left">slice</td></tr>
+        </table>
+    >,
+    shape="box3d",
+    style=filled,
+    fillcolor="#B6CAE8",
+  ];
+  K -> KChunk [style="dashed"];
+  { rank=same; K; KChunk; }
+  } // subgraph cluster_K
+
+  subgraph cluster_Y {
+    label="";
+  Y [
+    label=<
+      <table border="0" align="left">
+        <tr><td align="left"><u>Tensor: Y</u></td></tr>
+        <tr><td align="left">id</td></tr>
+        <tr><td align="left">dtype</td></tr>
+        <tr><td align="left">shape</td></tr>
+        </table>
+    >,
+    shape="box3d",
+    style=filled,
+    fillcolor="#D6EAF8",
+  ];
+  YChunk [
+    label=<
+      <table border="0" align="left">
+        <tr><td align="left"><u>TensorChunk: Y[i]</u></td></tr>
+        <tr><td align="left">slice</td></tr>
+        </table>
+    >,
+    shape="box3d",
+    style=filled,
+    fillcolor="#B6CAE8",
+  ];
+  Y -> YChunk [style="dashed"];
+  { rank=same; Y; YChunk; }
+  } // subgraph cluster_Y
+
+  subgraph cluster_H {
+    label="";
+  H [
+    label=<
+      <table border="0" align="left">
+        <tr><td align="left"><u>Tensor: H</u></td></tr>
+        <tr><td align="left">id</td></tr>
+        <tr><td align="left">dtype</td></tr>
+        <tr><td align="left">shape</td></tr>
+        </table>
+    >,
+    shape="box3d",
+    style=filled,
+    fillcolor="#D6EAF8",
+  ];
+  HChunk [
+    label=<
+      <table border="0" align="left">
+        <tr><td align="left"><u>TensorChunk: H[i]</u></td></tr>
+        <tr><td align="left">slice</td></tr>
+        </table>
+    >,
+    shape="box3d",
+    style=filled,
+    fillcolor="#B6CAE8",
+  ];
+  H -> HChunk [style="dashed"];
+  { rank=same; H; HChunk; }
+  } // subgraph cluster_H
+
+  TensorViewn [
+    label=<
+      <table border="0" align="left">
+        <tr><td align="left"><u>TensorView: n</u></td></tr>
+        <tr><td align="left">id</td></tr>
+        <tr><td align="left">concat_dim</td></tr>
+        <tr><td align="left">view</td></tr>
+        </table>
+    >,
+    shape="box3d",
+    style=filled,
+    fillcolor="#EBDEF0",
+  ];
+
+  TensorCopyH [
+    label=<
+      <table border="0" align="left">
+        <tr><td align="left"><u>TensorCopy: H</u></td></tr>
+        <tr><td align="left">id</td></tr>
+        </table>
+    >,
+    shape="box3d",
+    style=filled,
+    fillcolor="#EBDEF0",
+  ];
+
+  Y -> TensorViewn;
+  K -> TensorViewn;
+  TensorViewn -> TensorCopyH;
+  TensorCopyH -> H;
+
+  BlockOpA [
+    label=<
+      <table border="0" align="left">
+        <tr><td align="left"><u>BlockOp: A</u></td></tr>
+        <tr><td align="left">id</td></tr>
+        <tr><td port="operation" align="left">operation_id</td></tr>
+        <tr><td align="left">index_space</td></tr>
+        <tr><td align="left">projection_maps</td></tr>
+        </table>
+    >,
+    shape="rarrow",
+    style=filled,
+    fillcolor="#E5E8E8",
+    margin="0.2",
+  ];
+
+  BlockOpB [
+    label=<
+      <table border="0" align="left">
+        <tr><td align="left"><u>BlockOp: B</u></td></tr>
+        <tr><td align="left">id</td></tr>
+        <tr><td port="operation" align="left">operation_id</td></tr>
+        <tr><td align="left">index_space</td></tr>
+        <tr><td align="left">projection_maps</td></tr>
+        </table>
+    >,
+    shape="rarrow",
+    style=filled,
+    fillcolor="#E5E8E8",
+    margin="0.2",
+  ];
+  BlockOpB -> K;
+
+  BlockShard [
+    label=<
+      <table border="0" align="left">
+        <tr><td align="left"><u>BlockShard: A[i]</u></td></tr>
+        <tr><td align="left">id</td></tr>
+        <tr><td align="left">index_slice</td></tr>
+        <tr><td align="left">tensor_slice_map</td></tr>
+        </table>
+    >,
+    shape="component",
+    style="filled",
+    fillcolor="#B0F0F0",
+  ];
+
+  X -> m;
+
+  m -> BlockOpA;
+  W -> BlockOpA;
+  BlockOpA -> Y;
+  BlockOpA -> Z;
+
+  m -> BlockShard [style="dotted"];
+  W -> BlockShard [style="dotted"];
+  BlockShard -> YChunk [style="dotted"];
+  BlockShard -> ZChunk [style="dotted"];
+
+  BlockOpA -> BlockShard;
+  { rank=same; BlockOpA; BlockShard; }
+
+  Source [
+    shape="doubleoctagon",
+    style="filled",
+    fillcolor="#B0E0B0",
+  ];
+  Source -> X;
+  Source -> W;
+
+  Source -> BlockOpB [style="dashed"];
+
+  { rank=same; BlockOpA; BlockOpB; }
+
+  Sink [
+    shape="doubleoctagon",
+    style="filled",
+    fillcolor="#B0E0B0",
+  ];
+  H -> Sink;
+}

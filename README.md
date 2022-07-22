@@ -85,6 +85,8 @@ There are 4 primary components needed to demonstrate this:
   Explores common tensor block algorithms, and feasibility on extracting sharding patterns.
 * [Index Projection Design](IndexProjectionDesign.md)  
   Derives an index projection function design from index tensor block sharding exploration.
+* [Block Graph](BlockGraph.md)  
+  Describes the components of a block operation graph.
 
 
 ### Related Work
