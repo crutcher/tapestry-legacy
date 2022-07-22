@@ -213,4 +213,4 @@ Effective sharding depends on being able to predict marginal costs along shardin
 ## Next
 
 * [Table of Contents](README.md)
-* [Block Graph](Block Graph.md)
+* [Block Graph](BlockGraph.md)
