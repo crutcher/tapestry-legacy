@@ -19,6 +19,10 @@ resources:
 The approach is fine-grained modeling of marginal sharding at the block operation level, 
 enabling aggressive semantics preserving graph rewrites.
 
+We expect to evolve to source/sinked sharded tensor block operation representation, amenable
+to aggressive graph rewrites and node scheduling:
+![full graph](media/graphs/graph.full.dot.png)
+
 ## Discussion
 
 Please direct questions to the github issues for this project: 
