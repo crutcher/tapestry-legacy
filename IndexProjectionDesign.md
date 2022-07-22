@@ -210,6 +210,36 @@ dimension).
 
 Effective sharding depends on being able to predict marginal costs along sharding dimensions.
 
+## Incremental Block Memory and Execution Costs
+
+Block operations require some amount of intermediate storage and execution resources. Some may 
+produce their output tensors directly, but others may have, potentially very large, intermediate 
+tensors; and all blocks require some execution, which we'd like to model.
+
+We expect that well-behaved blocks will scale those storage needs along similar incremental
+dimensions; but describing only the input and output spaces of a block operation fails to
+make intermediate memory utilization visible to the graph scheduler.
+
+The prior art has a few suggestions:
+
+* Provide a per-index-point scale factor.
+  We could attach an estimated memory-per-index-point rate to all operations. While required at
+  the graph planning layer, we could apply a default, or probe for one, at the API layer.
+* Provide a per-index-dimension scale factor.
+  Expected costs scale differently along different index dimensions; so providing a 
+  per-index-dimension scale factor would allow more accurate modeling.
+* Probe the operation.
+  This would require (some) layer to probe the execution costs of the operation by running sample
+  blocks, in order to discover cost estimates. The cost estimates for a given block would be
+  relatively stable, and execution environments could have lookup pools of cost estimates.
+
+Apache Spark assumes a standard compute cost based upon the size of the data input, and that cost
+can be overridden for a given operation.
+
+Note that, due to the parallel nature of the CUDA/GPU/TPU dispatch mechanisms, incremental
+execution costs are not linear, and will have some expected cliff functions. Additionally, we may
+be interested in both wall time, and power.
+
 ## Next
 
 * [Table of Contents](README.md)

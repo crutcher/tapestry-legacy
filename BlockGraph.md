@@ -59,6 +59,12 @@ need to copy out a tensor view into reified storage. For this we introduce:
 
 ![full graph](media/graphs/graph.full.dot.png)
 
+Provided we had storage for the tensor chunks, and decomposed the *BlockOp* operations into 
+*BlockShard* components each small enough that their input, output, and intermediate data would 
+fit in a single node, we could write a (extremely inefficient) greedy scheduler which could run an 
+arbitrary graph to completion.
+
+
 ## Next
 
 * [Table of Contents](README.md)
