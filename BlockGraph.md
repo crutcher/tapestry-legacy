@@ -6,6 +6,8 @@
 To begin to make concrete a block operation graph, we need to collect the concepts already 
 discussed.
 
+To make it explicit, we're modeling DAGs, directed acyclic graphs; and forbidding loops.
+
 In any operation graph, it's standard to include *Source* and *Sink* node, to distinguish the 
 observation flow through the graph. Any operation or data which cannot be observed directly
 through *Sink* can be re-written (via fusion, or other operations); and any node which lacks
@@ -60,9 +62,16 @@ need to copy out a tensor view into reified storage. For this we introduce:
 ![full graph](media/graphs/graph.full.dot.png)
 
 Provided we had storage for the tensor chunks, and decomposed the *BlockOp* operations into 
-*BlockShard* components each small enough that their input, output, and intermediate data would 
-fit in a single node, we could write a (extremely inefficient) greedy scheduler which could run an 
-arbitrary graph to completion.
+*BlockShard* components such that their input, output, and intermediate data would fit in a
+single worker node, and that each *TensorChunk* was produced by exactly one *BlockShard*,
+we could write an (extremely inefficient) greedy scheduler which could run an arbitrary large
+graph to completion:
+
+* While there are *BlockShard*s or *TensorCopy*s observable through any path to *Sink*:
+  * Pick and execute at least one of them.
+
+It would only need to find a *BlockShard* or a *TensorCopy* who's inputs were all computed, and 
+execute it, until there were no more nodes of work to complete.
 
 
 ## Next
