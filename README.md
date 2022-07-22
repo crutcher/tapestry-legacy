@@ -37,7 +37,7 @@ in statistics, machine learning, physics, or some other branch of math that care
 the other requires specialized training in scheduling theory, distributed system engineering,
 and compiler design.
 
-Exiting dataflow environments are already
+Existing dataflow environments are already
 [embarrassingly parallel](https://en.wikipedia.org/wiki/Embarrassingly_parallel), able to
 exploit large numbers of workers simultaneously, while computing effective function dependencies
 between calculations.
