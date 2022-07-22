@@ -98,5 +98,11 @@ There are 4 primary components needed to demonstrate this:
 * *FAX* on *jax.pjit* \
   https://www.arxiv-vanity.com/papers/2204.06514/ \
   Appears to be pursuing similar slicing research, using *jax.pjit* as a backend.
+* *Glow* \
+  https://arxiv.org/pdf/1805.00907.pdf \
+  Appears to be focused on single-machine graph optimization.
+* *aesara* \
+  https://github.com/aesara-devs/aesara \
+  Focuses on rewriting tensor operation graphs on local machines.
 
 

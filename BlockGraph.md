@@ -11,7 +11,7 @@ To make it explicit, we're modeling DAGs, directed acyclic graphs; and forbiddin
 In any operation graph, it's standard to include *Source* and *Sink* node, to distinguish the 
 observation flow through the graph. Any operation or data which cannot be observed directly
 through *Sink* can be re-written (via fusion, or other operations); and any node which lacks
-any functional dependency path to *Sink* can be removed entirely.
+any functional dependency path to *Sink* can and should be removed entirely.
 
 At an initial level, we see:
 
@@ -24,6 +24,7 @@ The *BlockOp* nodes refer to an *operation_id*. This is the id of the block oper
 planning environment; at this layer it is not important how that operation is implemented, so
 an id is sufficient, but it is important (for rewrite operations) to be able to determine what
 the block operation is.
+
 
 ![block ops](media/graphs/graph.block_ops.dot.png)
 
