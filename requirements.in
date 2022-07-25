@@ -54,3 +54,7 @@ pydot
 
 # graphing
 matplotlib
+
+# serializaton
+marshmallow
+
