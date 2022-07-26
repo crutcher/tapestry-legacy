@@ -1,7 +1,20 @@
 import re
 import uuid
-from typing import Dict, Iterable, Optional
+from dataclasses import field
+from typing import Any, Dict, Iterable, Mapping, Optional, Type, TypeVar
 from uuid import UUID
+
+import marshmallow
+from marshmallow_dataclass import dataclass
+
+K = TypeVar("K")
+V = TypeVar("V")
+
+
+def ensure_dict(val: Optional[Mapping[K, V]]) -> Dict[K, V]:
+    if val is None:
+        val = {}
+    return dict(val)
 
 
 def ensure_uuid(val: Optional[UUID] = None) -> UUID:
@@ -10,71 +23,66 @@ def ensure_uuid(val: Optional[UUID] = None) -> UUID:
     return val
 
 
-TYPE_NAME_PATTERN = "^[a-zA-Z][_a-zA-Z0-9]*(\.[a-zA-Z][_a-zA-Z0-9]*)*$"
+TYPE_NAME_PATTERN = r"^[a-zA-Z][_a-zA-Z0-9]*(\.[a-zA-Z][_a-zA-Z0-9]*)*$"
 TYPE_NAME_REGEX = re.compile(TYPE_NAME_PATTERN)
 
+C = TypeVar("C", bound="JsonSerializable")
 
-class TapestryType:
-    _type_name: str
+
+class JsonSerializable:
+    @classmethod
+    def get_schema(cls) -> marshmallow.Schema:
+        return getattr(cls, "Schema")()
+
+    def to_json_data(self) -> Any:
+        return self.get_schema().dump(self)
+
+    @classmethod
+    def from_json_data(cls: Type[C], data: Any) -> C:
+        return cls.get_schema().load(data)
+
+
+@dataclass
+class TapestryNodeDoc(JsonSerializable):
+    id: UUID
+    type: str
+    fields: Dict[str, Any]
 
     def __init__(
         self,
         *,
-        type_name: str,
+        id: Optional[UUID] = None,
+        type: str,
+        fields: Optional[Mapping[str, Any]] = None,
     ):
-        if not re.fullmatch(TYPE_NAME_REGEX, type_name):
-            raise AssertionError(
-                f'Illegal type name, found "{type_name}", expected: {TYPE_NAME_PATTERN}'
-            )
-        self._type_name = type_name
-
-    def name(self) -> str:
-        return self._type_name
+        self.id = ensure_uuid(id)
+        self.type = type
+        self.fields = ensure_dict(fields)
 
 
-class TapestryNode:
-    _node_id: UUID
-    _node_type: TapestryType
-
-    def __init__(
-        self,
-        *,
-        node_id: Optional[UUID] = None,
-        node_type: TapestryType,
-    ):
-        self._node_id = ensure_uuid(node_id)
-        self._node_type = node_type
-
-    def node_id(self) -> UUID:
-        return self._node_id
-
-    def node_type(self) -> TapestryType:
-        return self._node_type
-
-
-class TapestryGraph:
-    _graph_id: UUID
+@dataclass
+class TapestryGraphDoc(JsonSerializable):
+    id: UUID
 
     # graph meta?
     # _graph_type: TapestryType
 
-    _nodes: Dict[UUID, TapestryNode]
+    nodes: Dict[UUID, TapestryNodeDoc] = field(default_factory=dict)
 
     def __init__(
         self,
         *,
-        graph_id: Optional[UUID] = None,
+        id: Optional[UUID] = None,
+        nodes: Optional[Mapping[UUID, TapestryNodeDoc]] = None,
     ):
-        self._graph_id = ensure_uuid(graph_id)
-        self._nodes = {}
+        self.id = ensure_uuid(id)
+        self.nodes = ensure_dict(nodes)
 
-    def add_node(self, node: TapestryNode) -> None:
-        node_id = node.node_id()
+    def add_node(self, node: TapestryNodeDoc) -> None:
+        if node.id in self.nodes:
+            raise AssertionError(f"Node {node.id} already in graph.")
 
-        if node_id in self._nodes:
-            raise AssertionError(f"Node {node_id} already in graph.")
+        self.nodes[node.id] = node
 
-        self._nodes[node_id] = node
-
-    def nodes_view(self) -> Iterable[TapestryNode]:
-        return self._nodes.values()
+    def nodes_view(self) -> Iterable[TapestryNodeDoc]:
+        return self.nodes.values()

@@ -4,7 +4,31 @@ import uuid
 import hamcrest
 
 from tapestry.graph import core
+from tapestry.graph.core import JsonSerializable
 from tapestry.testlib import eggs
+
+
+def assert_json_serializable_roundtrip(actual, json_data) -> None:
+    """
+    Assert that a JsonSerializable class roundtrips to target json data.
+
+    :param actual: the object.
+    :param json_data: the expected json data.
+    """
+    eggs.assert_match(
+        actual,
+        hamcrest.instance_of(JsonSerializable),
+    )
+
+    eggs.assert_match(
+        actual.to_json_data(),
+        json_data,
+    )
+
+    eggs.assert_match(
+        type(actual).from_json_data(json_data),
+        actual,
+    )
 
 
 class TestEnsureUuid(unittest.TestCase):
@@ -21,50 +45,37 @@ class TestEnsureUuid(unittest.TestCase):
         )
 
 
-class TestTapestryType(unittest.TestCase):
-    def test_basic(self) -> None:
-        foo_type = core.TapestryType(type_name="foo")
+class TestTapestryNodeDoc(unittest.TestCase):
+    def test_lifecycle(self) -> None:
+        node = core.TapestryNodeDoc(type="foo")
+
         eggs.assert_match(
-            foo_type.name(),
+            node.type,
             "foo",
         )
-
-    def test_bad_name(self) -> None:
-        for name in [
-            "",
-            "foo..bar",
-            "_foo",
-            "9foo",
-        ]:
-            eggs.assert_raises(
-                lambda: core.TapestryType(type_name=name),
-                AssertionError,
-                "Illegal type name",
-            )
-
-
-class TestTapestryNode(unittest.TestCase):
-    def test_lifecycle(self) -> None:
-        foo_type = core.TapestryType(type_name="foo")
-
-        node = core.TapestryNode(node_type=foo_type)
-
         eggs.assert_match(
-            node.node_type(),
-            foo_type,
-        )
-        eggs.assert_match(
-            node.node_id(),
+            node.id,
             hamcrest.instance_of(uuid.UUID),
         )
 
+    def test_json(self) -> None:
+        node = core.TapestryNodeDoc(type="foo")
 
-class TestTapestryGraph(unittest.TestCase):
+        assert_json_serializable_roundtrip(
+            node,
+            {
+                "id": str(node.id),
+                "type": "foo",
+                "fields": {},
+            },
+        )
+
+
+class TestTapestryGraphDoc(unittest.TestCase):
     def test_lifecycle(self) -> None:
-        graph = core.TapestryGraph()
+        graph = core.TapestryGraphDoc()
 
-        foo_type = core.TapestryType(type_name="foo")
-        node = core.TapestryNode(node_type=foo_type)
+        node = core.TapestryNodeDoc(type="foo")
 
         graph.add_node(node)
 
@@ -75,6 +86,24 @@ class TestTapestryGraph(unittest.TestCase):
         )
 
         eggs.assert_match(
-            graph.nodes_view(),
-            hamcrest.contains_exactly(node),
+            graph.nodes,
+            hamcrest.has_entry(
+                node.id,
+                node,
+            ),
+        )
+
+    def test_json(self) -> None:
+        graph = core.TapestryGraphDoc()
+        node = core.TapestryNodeDoc(type="foo")
+        graph.add_node(node)
+
+        assert_json_serializable_roundtrip(
+            graph,
+            {
+                "id": str(graph.id),
+                "nodes": {
+                    str(node.id): node.to_json_data(),
+                },
+            },
         )
