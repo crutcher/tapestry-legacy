@@ -3,8 +3,8 @@ import uuid
 
 import hamcrest
 
-from tapestry.graph import core
-from tapestry.graph.core import JsonSerializable
+import tapestry.graph.docs
+from tapestry.graph.docs import JsonSerializable
 from tapestry.testlib import eggs
 
 
@@ -35,9 +35,9 @@ class TestEnsureUuid(unittest.TestCase):
     def test_ensure_uuid(self):
         a = uuid.uuid4()
 
-        eggs.assert_match(core.ensure_uuid(a), a)
+        eggs.assert_match(tapestry.graph.docs.ensure_uuid(a), a)
         eggs.assert_match(
-            core.ensure_uuid(),
+            tapestry.graph.docs.ensure_uuid(),
             hamcrest.all_of(
                 hamcrest.instance_of(uuid.UUID),
                 hamcrest.is_not(a),
@@ -47,7 +47,7 @@ class TestEnsureUuid(unittest.TestCase):
 
 class TestTapestryNodeDoc(unittest.TestCase):
     def test_lifecycle(self) -> None:
-        node = core.TapestryNodeDoc(type="foo")
+        node = tapestry.graph.docs.TapestryNodeDoc(type="foo")
 
         eggs.assert_match(
             node.type,
@@ -59,7 +59,7 @@ class TestTapestryNodeDoc(unittest.TestCase):
         )
 
     def test_json(self) -> None:
-        node = core.TapestryNodeDoc(type="foo")
+        node = tapestry.graph.docs.TapestryNodeDoc(type="foo")
 
         assert_json_serializable_roundtrip(
             node,
@@ -73,9 +73,9 @@ class TestTapestryNodeDoc(unittest.TestCase):
 
 class TestTapestryGraphDoc(unittest.TestCase):
     def test_lifecycle(self) -> None:
-        graph = core.TapestryGraphDoc()
+        graph = tapestry.graph.docs.TapestryGraphDoc()
 
-        node = core.TapestryNodeDoc(type="foo")
+        node = tapestry.graph.docs.TapestryNodeDoc(type="foo")
 
         graph.add_node(node)
 
@@ -94,8 +94,8 @@ class TestTapestryGraphDoc(unittest.TestCase):
         )
 
     def test_json(self) -> None:
-        graph = core.TapestryGraphDoc()
-        node = core.TapestryNodeDoc(type="foo")
+        graph = tapestry.graph.docs.TapestryGraphDoc()
+        node = tapestry.graph.docs.TapestryNodeDoc(type="foo")
         graph.add_node(node)
 
         assert_json_serializable_roundtrip(

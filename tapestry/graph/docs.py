@@ -23,9 +23,6 @@ def ensure_uuid(val: Optional[UUID] = None) -> UUID:
     return val
 
 
-TYPE_NAME_PATTERN = r"^[a-zA-Z][_a-zA-Z0-9]*(\.[a-zA-Z][_a-zA-Z0-9]*)*$"
-TYPE_NAME_REGEX = re.compile(TYPE_NAME_PATTERN)
-
 C = TypeVar("C", bound="JsonSerializable")
 
 
@@ -42,8 +39,16 @@ class JsonSerializable:
         return cls.get_schema().load(data)
 
 
+TYPE_NAME_PATTERN = r"^[a-zA-Z][_a-zA-Z0-9]*(\.[a-zA-Z][_a-zA-Z0-9]*)*$"
+TYPE_NAME_REGEX = re.compile(TYPE_NAME_PATTERN)
+
+
 @dataclass
 class TapestryNodeDoc(JsonSerializable):
+    """
+    Serialization format for Tapestry Nodes.
+    """
+
     id: UUID
     type: str
     fields: Dict[str, Any]
@@ -62,11 +67,11 @@ class TapestryNodeDoc(JsonSerializable):
 
 @dataclass
 class TapestryGraphDoc(JsonSerializable):
+    """
+    Serialization format for Tapestry Graphs.
+    """
+
     id: UUID
-
-    # graph meta?
-    # _graph_type: TapestryType
-
     nodes: Dict[UUID, TapestryNodeDoc] = field(default_factory=dict)
 
     def __init__(
