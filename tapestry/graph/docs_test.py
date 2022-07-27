@@ -3,8 +3,7 @@ import uuid
 
 import hamcrest
 
-import tapestry.graph.docs
-from tapestry.graph.docs import JsonSerializable
+import tapestry.graph.docs as docs
 from tapestry.testlib import eggs
 
 
@@ -17,7 +16,7 @@ def assert_json_serializable_roundtrip(actual, json_data) -> None:
     """
     eggs.assert_match(
         actual,
-        hamcrest.instance_of(JsonSerializable),
+        hamcrest.instance_of(docs.JsonSerializable),
     )
 
     eggs.assert_match(
@@ -35,9 +34,9 @@ class TestEnsureUuid(unittest.TestCase):
     def test_ensure_uuid(self):
         a = uuid.uuid4()
 
-        eggs.assert_match(tapestry.graph.docs.ensure_uuid(a), a)
+        eggs.assert_match(docs.ensure_uuid(a), a)
         eggs.assert_match(
-            tapestry.graph.docs.ensure_uuid(),
+            docs.ensure_uuid(),
             hamcrest.all_of(
                 hamcrest.instance_of(uuid.UUID),
                 hamcrest.is_not(a),
@@ -47,7 +46,7 @@ class TestEnsureUuid(unittest.TestCase):
 
 class TestTapestryNodeDoc(unittest.TestCase):
     def test_lifecycle(self) -> None:
-        node = tapestry.graph.docs.TapestryNodeDoc(type="foo")
+        node = docs.TapestryNodeDoc(type="foo")
 
         eggs.assert_match(
             node.type,
@@ -59,7 +58,7 @@ class TestTapestryNodeDoc(unittest.TestCase):
         )
 
     def test_json(self) -> None:
-        node = tapestry.graph.docs.TapestryNodeDoc(type="foo")
+        node = docs.TapestryNodeDoc(type="foo")
 
         assert_json_serializable_roundtrip(
             node,
@@ -71,39 +70,156 @@ class TestTapestryNodeDoc(unittest.TestCase):
         )
 
 
-class TestTapestryGraphDoc(unittest.TestCase):
-    def test_lifecycle(self) -> None:
-        graph = tapestry.graph.docs.TapestryGraphDoc()
+class TestTapestryEdgeDoc(unittest.TestCase):
+    def test_json(self) -> None:
+        a = uuid.uuid4()
+        b = uuid.uuid4()
+        edge = docs.TapestryEdgeDoc(
+            type="foo",
+            source=a,
+            target=b,
+        )
 
-        node = tapestry.graph.docs.TapestryNodeDoc(type="foo")
+        assert_json_serializable_roundtrip(
+            edge,
+            {
+                "type": "foo",
+                "source": str(a),
+                "target": str(b),
+            },
+        )
+
+
+class TestTapestryGraphDoc(unittest.TestCase):
+    def test_nodes(self) -> None:
+        graph = docs.TapestryGraphDoc()
+
+        node = docs.TapestryNodeDoc(type="foo")
 
         graph.add_node(node)
 
         eggs.assert_raises(
             lambda: graph.add_node(node),
-            AssertionError,
+            ValueError,
             "already in graph",
         )
 
         eggs.assert_match(
             graph.nodes,
-            hamcrest.has_entry(
-                node.id,
+            hamcrest.contains_exactly(
                 node,
             ),
         )
 
+    def test_edges(self) -> None:
+        graph = docs.TapestryGraphDoc()
+        nodeA = docs.TapestryNodeDoc(type="foo")
+        nodeB = docs.TapestryNodeDoc(type="bar")
+
+        graph.add_node(nodeA)
+        graph.add_node(nodeB)
+
+        edge = docs.TapestryEdgeDoc(
+            type="link",
+            source=nodeA.id,
+            target=nodeB.id,
+        )
+        graph.add_edge(
+            type="link",
+            source=nodeA.id,
+            target=nodeB.id,
+        )
+
+        eggs.assert_raises(
+            lambda: graph.add_edge(edge),
+            ValueError,
+            "already in graph",
+        )
+
+        eggs.assert_match(
+            graph.find_edges(),
+            hamcrest.contains_inanyorder(
+                edge,
+            ),
+        )
+        eggs.assert_match(
+            graph.find_edges(types="unknown"),
+            hamcrest.empty(),
+        )
+        eggs.assert_match(
+            graph.find_edges(types="link", sources=uuid.uuid4()),
+            hamcrest.empty(),
+        )
+        eggs.assert_match(
+            graph.find_edges(types="link", targets=uuid.uuid4()),
+            hamcrest.empty(),
+        )
+        eggs.assert_match(
+            graph.find_edges(types="link"),
+            hamcrest.contains_inanyorder(
+                edge,
+            ),
+        )
+        eggs.assert_match(
+            graph.find_edges(sources=nodeA),
+            hamcrest.contains_inanyorder(
+                edge,
+            ),
+        )
+        eggs.assert_match(
+            graph.find_edges(targets=nodeA),
+            hamcrest.empty(),
+        )
+        eggs.assert_match(
+            graph.find_edges(targets=nodeB),
+            hamcrest.contains_inanyorder(
+                edge,
+            ),
+        )
+        eggs.assert_match(
+            graph.find_edges(sources=nodeB),
+            hamcrest.empty(),
+        )
+
+        eggs.assert_match(
+            graph.edges,
+            hamcrest.contains_exactly(
+                edge,
+            ),
+        )
+
+        graph.remove_edge(edge)
+        eggs.assert_raises(
+            lambda: graph.remove_edge(edge),
+            ValueError,
+            "not in graph",
+        )
+
+        eggs.assert_match(
+            graph.edges,
+            hamcrest.empty(),
+        )
+
     def test_json(self) -> None:
-        graph = tapestry.graph.docs.TapestryGraphDoc()
-        node = tapestry.graph.docs.TapestryNodeDoc(type="foo")
+        graph = docs.TapestryGraphDoc()
+        node = docs.TapestryNodeDoc(type="foo")
         graph.add_node(node)
+
+        edge = graph.add_edge(
+            type="foo",
+            source=node.id,
+            target=node.id,
+        )
 
         assert_json_serializable_roundtrip(
             graph,
             {
                 "id": str(graph.id),
-                "nodes": {
-                    str(node.id): node.to_json_data(),
-                },
+                "nodes": [
+                    node.to_json_data(),
+                ],
+                "edges": [
+                    edge.to_json_data(),
+                ],
             },
         )
