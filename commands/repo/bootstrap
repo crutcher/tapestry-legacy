@@ -12,7 +12,5 @@ if [ ! -f constraints.in ]; then
   touch constraints.in
 fi
 
-source venv/bin/activate
-
 $GRIND repo psync
 
