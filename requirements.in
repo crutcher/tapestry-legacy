@@ -53,6 +53,8 @@ jupyter
 graphviz
 pydot
 
+networkx
+
 # graphing
 matplotlib
 
