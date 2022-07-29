@@ -91,6 +91,8 @@ There are 4 primary components needed to demonstrate this:
   Derives an index projection function design from index tensor block sharding exploration.
 * [Block Graph](BlockGraph.md)  
   Describes the components of a block operation graph.
+* [Intermediate Representation Design](IntermediateRepresentationDesign.md)  
+  Describes tradeoffs in selecting an intermediate representation for graph lowering.
 
 
 ### Related Work

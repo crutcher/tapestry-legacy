@@ -1,7 +1,7 @@
 # Block Graph
 
 * [Table of Contents](README.md)
-* [Previous](IndexProjectionDesign.md)
+* [Previous: Index Projection Design](IndexProjectionDesign.md)
 
 To begin to make concrete a block operation graph, we need to collect the concepts already 
 discussed.
@@ -78,3 +78,4 @@ execute it, until there were no more nodes of work to complete.
 ## Next
 
 * [Table of Contents](README.md)
+* [Next: Intermediate Representation Design](IntermediateRepresentationDesign.md)

@@ -87,6 +87,11 @@ def assert_valid_typename(type_name: str) -> str:
     return type_name
 
 
+@dataclass(frozen=True)
+class TapestryTargetDoc(JsonSerializable):
+    _target_: UUID
+
+
 @dataclass
 class TapestryNodeDoc(JsonSerializable):
     """
