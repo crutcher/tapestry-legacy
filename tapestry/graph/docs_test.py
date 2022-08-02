@@ -20,12 +20,12 @@ def assert_json_serializable_roundtrip(actual, json_data) -> None:
     )
 
     eggs.assert_match(
-        actual.to_json_data(),
+        actual.dump_json_data(),
         json_data,
     )
 
     eggs.assert_match(
-        type(actual).from_json_data(json_data),
+        type(actual).load_json_data(json_data),
         actual,
     )
 
@@ -216,10 +216,10 @@ class TestTapestryGraphDoc(unittest.TestCase):
             {
                 "id": str(graph.id),
                 "nodes": [
-                    node.to_json_data(),
+                    node.dump_json_data(),
                 ],
                 "edges": [
-                    edge.to_json_data(),
+                    edge.dump_json_data(),
                 ],
             },
         )

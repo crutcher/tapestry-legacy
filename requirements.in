@@ -52,6 +52,7 @@ jupyter
 # graphviz stuff
 graphviz
 pydot
+networkx
 
 # graphing
 matplotlib

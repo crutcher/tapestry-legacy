@@ -51,14 +51,17 @@ C = TypeVar("C", bound="JsonSerializable")
 
 
 class JsonSerializable:
+    class Meta:
+        ordered = True
+
     @classmethod
     def get_schema(cls) -> marshmallow.Schema:
         return getattr(cls, "Schema")()
 
-    def to_json_data(self) -> Any:
+    def dump_json_data(self) -> Any:
         return self.get_schema().dump(self)
 
-    def to_json_str(
+    def dump_json_str(
         self,
         *,
         indent: Optional[int] = None,
@@ -66,12 +69,18 @@ class JsonSerializable:
         return self.get_schema().dumps(self, indent=indent)
 
     @classmethod
-    def from_json_data(cls: Type[C], data: Any) -> C:
+    def load_json_data(cls: Type[C], data: Any) -> C:
         return cls.get_schema().load(data)
 
     @classmethod
-    def from_json_str(cls: Type[C], data: str) -> C:
+    def load_json_str(cls: Type[C], data: str) -> C:
         return cls.get_schema().loads(data)
+
+    def __str__(self):
+        return self.dump_json_str()
+
+    def pretty(self):
+        return self.dump_json_str(indent=2)
 
 
 TYPE_NAME_PATTERN = r"^[a-zA-Z][_a-zA-Z0-9]*(\.[a-zA-Z][_a-zA-Z0-9]*)*$"
@@ -102,9 +111,6 @@ class TapestryNodeDoc(JsonSerializable):
     type: str
     fields: Dict[str, Any]
 
-    class Meta:
-        ordered = True
-
     def __init__(
         self,
         *,
@@ -125,9 +131,6 @@ class TapestryEdgeDoc(JsonSerializable):
 
     def __post_init__(self):
         assert_valid_typename(self.type)
-
-    class Meta:
-        ordered = True
 
 
 def to_set_and_duplicates(items: Iterable[V]) -> Tuple[Set[V], Set[V]]:
@@ -165,8 +168,6 @@ class TapestryGraphDoc(JsonSerializable):
             "_node_map",
             "_edge_set",
         )
-
-        ordered = True
 
     def __init__(
         self,
@@ -263,6 +264,11 @@ class TapestryGraphDoc(JsonSerializable):
         :param edge:
         :return: the new edge.
         """
+        if isinstance(source, TapestryNodeDoc):
+            source = source.id
+        if isinstance(target, TapestryNodeDoc):
+            target = target.id
+
         if edge and (type or source or target):
             raise ValueError("edge and (type, source, target) are mutually exclusive.")
         if not edge:
