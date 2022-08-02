@@ -54,6 +54,8 @@ graphviz
 pydot
 networkx
 
+networkx
+
 # graphing
 matplotlib
 
