@@ -1,14 +1,24 @@
+import functools
 from typing import List
 
 import numpy as np
 from marshmallow import fields
 from marshmallow_dataclass import NewType, dataclass
 
+from tapestry.class_utils import Frozen
 from tapestry.numpy_util import as_zarray, np_hash
 from tapestry.serialization.json import JsonSerializable
 
 
+def ndarray_lt(a, b) -> bool:
+    return tuple(a.flat) < tuple(b.flat)
+
+
 class ZArrayField(fields.Field):
+    """
+    Marshmallow Field type for ℤ-Space (integer) numpy NDarrays.
+    """
+
     def __init__(self, *args, **kwargs):
         super(ZArrayField, self).__init__(*args, **kwargs)
 
@@ -26,10 +36,34 @@ class ZArrayField(fields.Field):
 
 
 ZArray = NewType("NdArray", np.ndarray, field=ZArrayField)
+"""
+Marshmallow NewType for ZArrayField.
+
+Usage:
+
+>>> @marshmallow_dataclass.dataclass
+... class Example:
+...     coords: ZArray
+"""
+
+
+class FrozenDoc(JsonSerializable, Frozen):
+    """Aggregate JsonSerializable, Frozen base class."""
 
 
 @dataclass
-class ZRange(JsonSerializable):
+@functools.total_ordering
+class ZRange(FrozenDoc):
+    """
+    [start, end) coordinate range in ℤ-Space.
+
+    * `start` is inclusive, if the range is non-empty,
+    * `end` is exclusive,
+    * there are infinitely many empty ranges with the same `start`
+    """
+
+    __slots__ = ("start", "end")
+
     start: ZArray
     end: ZArray
 
@@ -40,11 +74,15 @@ class ZRange(JsonSerializable):
             start = np.zeros_like(end)
         start = as_zarray(start, ndim=1, immutable=True)
 
-        self.start = start
-        self.end = end
+        with self._thaw_context():
+            self.start = start
+            self.end = end
 
         if not np.all(self.end >= self.start):
             raise ValueError(f"start ({self.start}) is not >= end ({self.end})")
+
+    def __hash__(self) -> int:
+        return np_hash(self.start) ^ np_hash(self.end)
 
     def __eq__(self, other) -> bool:
         if not isinstance(other, ZRange):
@@ -57,34 +95,50 @@ class ZRange(JsonSerializable):
             )
         )
 
-    def __hash__(self) -> int:
-        return np_hash(self.start) ^ np_hash(self.end)
+    def __lt__(self, other) -> bool:
+        if not isinstance(other, ZRange):
+            raise TypeError(f"Cannot compare ({type(self)}) and ({type(other)})")
+
+        return ndarray_lt(self.start, other.start) and ndarray_lt(self.end, other.end)
 
     @property
     def ndim(self) -> int:
+        "The number of dimensions of the ZSpace coordinate."
         return len(self.start)
 
     @property
     def shape(self) -> np.ndarray:
+        "The shape of the range."
         return self.end - self.start
 
     @property
     def size(self) -> int:
+        "The size of the range."
         return self.shape.prod()
 
     @property
     def empty(self) -> bool:
+        "Is the range empty?"
         return self.size == 0
 
+    @property
+    def nonempty(self) -> bool:
+        "Is the range non-empty?"
+        return not self.empty
+
     def inclusive_corners(self) -> List[np.ndarray]:
+        """
+        Every inclusive corner in the range.
+
+        * Duplicate corners will be included once,
+        * Empty ranges will return []
+        """
         if self.empty:
             return []
 
         ndim = self.ndim
         shape = self.shape
         inclusive_end = self.end - 1
-
-        # generate every inclusive corner once.
 
         corners = [np.array([], dtype=np.int64)]
         for d in range(ndim):
@@ -98,19 +152,29 @@ class ZRange(JsonSerializable):
 
 
 @dataclass
-class CoordMap(JsonSerializable):
+class CoordMap(FrozenDoc):
+    """
+    Affine ℤ-Space map from one coordinate space to another.
+    """
+
     projection: ZArray
+    """The projection matrix."""
     offset: ZArray
+    """The offset vector."""
 
     def __init__(self, projection, offset):
-        self.projection = as_zarray(projection, ndim=2, immutable=True)
-        self.offset = as_zarray(offset, ndim=1, immutable=True)
+        with self._thaw_context():
+            self.projection = as_zarray(projection, ndim=2, immutable=True)
+            self.offset = as_zarray(offset, ndim=1, immutable=True)
 
         if self.out_dim != self.offset.shape[0]:
             raise ValueError(
                 f"Projection output shape ({self.projection.shape})"
                 f" != offset shape: ({self.offset.shape})"
             )
+
+    def __hash__(self) -> int:
+        return hash(self.projection) ^ np_hash(self.offset)
 
     def __eq__(self, other) -> bool:
         if not isinstance(other, CoordMap):
@@ -123,8 +187,13 @@ class CoordMap(JsonSerializable):
             )
         )
 
-    def __hash__(self) -> int:
-        return hash(self.projection) ^ np_hash(self.offset)
+    def __lt__(self, other) -> bool:
+        if not isinstance(other, CoordMap):
+            raise TypeError(f"Cannot compare ({type(self)}) and ({type(other)})")
+
+        return ndarray_lt(self.projection, other.projection) and ndarray_lt(
+            self.offset, other.offset
+        )
 
     @property
     def in_dim(self) -> int:
@@ -142,13 +211,17 @@ class CoordMap(JsonSerializable):
 
 
 @dataclass
-class RangeMap(JsonSerializable):
+class RangeMap(FrozenDoc):
     coord_map: CoordMap
     shape: ZArray
 
     def __init__(self, coord_map: CoordMap, shape):
-        self.coord_map = coord_map
-        self.shape = as_zarray(shape, ndim=1, immutable=True)
+        with self._thaw_context():
+            self.coord_map = coord_map
+            self.shape = as_zarray(shape, ndim=1, immutable=True)
+
+    def __hash__(self) -> int:
+        return hash(self.coord_map) ^ np_hash(self.shape)
 
     def __eq__(self, other) -> bool:
         if not isinstance(other, RangeMap):
@@ -161,8 +234,13 @@ class RangeMap(JsonSerializable):
             )
         )
 
-    def __hash__(self) -> int:
-        return hash(self.coord_map) ^ np_hash(self.shape)
+    def __lt__(self, other) -> bool:
+        if not isinstance(other, RangeMap):
+            raise TypeError(f"Cannot compare ({type(self)}) and ({type(other)})")
+
+        return (self.coord_map < other.coord_map) and ndarray_lt(
+            self.shape, other.shape
+        )
 
     def point_to_range(self, coord) -> ZRange:
         start = self.coord_map(coord)

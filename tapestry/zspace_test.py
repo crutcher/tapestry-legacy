@@ -11,6 +11,12 @@ class ZRangeTest(unittest.TestCase):
     def test_basic(self) -> None:
         a = ZRange([2, 3])
 
+        eggs.assert_raises(
+            lambda: setattr(a, "start", [2, 2]),
+            AssertionError,
+            'Illegal attempt to set "start"',
+        )
+
         assert_json_serializable_roundtrip(
             a,
             {"start": [0, 0], "end": [2, 3]},
