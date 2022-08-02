@@ -152,6 +152,7 @@ class ZRange(FrozenDoc):
 
 
 @dataclass
+@functools.total_ordering
 class CoordMap(FrozenDoc):
     """
     Affine ℤ-Space map from one coordinate space to another.
@@ -211,6 +212,7 @@ class CoordMap(FrozenDoc):
 
 
 @dataclass
+@functools.total_ordering
 class RangeMap(FrozenDoc):
     coord_map: CoordMap
     shape: ZArray
