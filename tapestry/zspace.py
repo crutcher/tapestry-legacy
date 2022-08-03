@@ -10,13 +10,24 @@ from tapestry.numpy_util import as_zarray, np_hash
 from tapestry.serialization.json import JsonSerializable
 
 
-def ndarray_lt(a, b) -> bool:
+def _ndarray_lt(a, b) -> bool:
+    """Establish a less than (<) ordering between numpy tuples."""
     return tuple(a.flat) < tuple(b.flat)
+
+
+def _ndarray_le(a, b) -> bool:
+    """Establish a less than (<) ordering between numpy tuples."""
+    return tuple(a.flat) <= tuple(b.flat)
 
 
 class ZArrayField(fields.Field):
     """
     Marshmallow Field type for ℤ-Space (integer) numpy NDarrays.
+
+    Depends upon the following `setup.cfg` for mpyp:
+
+    >>> [mypy]
+    >>> plugins = marshmallow_dataclass.mypy
     """
 
     def __init__(self, *args, **kwargs):
@@ -68,11 +79,20 @@ class ZRange(FrozenDoc):
     end: ZArray
 
     def __init__(self, end, *, start=None):
-        end = as_zarray(end, ndim=1, immutable=True)
+        end = as_zarray(
+            end,
+            ndim=1,
+            immutable=True,
+        )
 
         if start is None:
             start = np.zeros_like(end)
-        start = as_zarray(start, ndim=1, immutable=True)
+
+        start = as_zarray(
+            start,
+            ndim=1,
+            immutable=True,
+        )
 
         with self._thaw_context():
             self.start = start
@@ -99,7 +119,12 @@ class ZRange(FrozenDoc):
         if not isinstance(other, ZRange):
             raise TypeError(f"Cannot compare ({type(self)}) and ({type(other)})")
 
-        return ndarray_lt(self.start, other.start) and ndarray_lt(self.end, other.end)
+        if _ndarray_lt(self.start, other.start):
+            return True
+
+        return np.array_equal(self.start, other.start) and _ndarray_lt(
+            self.end, other.end
+        )
 
     @property
     def ndim(self) -> int:
@@ -143,17 +168,17 @@ class ZRange(FrozenDoc):
         corners = [np.array([], dtype=np.int64)]
         for d in range(ndim):
             cs = [self.start[d]]
-            if shape[d]:
+            if shape[d] > 1:
                 cs.append(inclusive_end[d])
 
-            corners = [np.append(p, c) for p in corners for c in cs]
+            old_corners = corners
+            corners = [np.append(p, c) for p in old_corners for c in cs]
 
         return corners
 
 
 @dataclass
-@functools.total_ordering
-class CoordMap(FrozenDoc):
+class ZAffineMap(FrozenDoc):
     """
     Affine ℤ-Space map from one coordinate space to another.
     """
@@ -165,35 +190,35 @@ class CoordMap(FrozenDoc):
 
     def __init__(self, projection, offset):
         with self._thaw_context():
-            self.projection = as_zarray(projection, ndim=2, immutable=True)
-            self.offset = as_zarray(offset, ndim=1, immutable=True)
+            self.projection = as_zarray(
+                projection,
+                ndim=2,
+                immutable=True,
+            )
+            self.offset = as_zarray(
+                offset,
+                ndim=1,
+                immutable=True,
+            )
 
         if self.out_dim != self.offset.shape[0]:
             raise ValueError(
-                f"Projection output shape ({self.projection.shape})"
-                f" != offset shape: ({self.offset.shape})"
+                f"Projection output shape ({self.projection.shape[1]})"
+                f" != offset shape ({self.offset.shape[0]})"
             )
 
     def __hash__(self) -> int:
-        return hash(self.projection) ^ np_hash(self.offset)
+        return np_hash(self.projection) ^ np_hash(self.offset)
 
     def __eq__(self, other) -> bool:
-        if not isinstance(other, CoordMap):
+        if not isinstance(other, ZAffineMap):
             return False
 
         return all(
             (
-                self.projection == other.projection,
+                np.array_equal(self.projection, other.projection),
                 np.array_equal(self.offset, other.offset),
             )
-        )
-
-    def __lt__(self, other) -> bool:
-        if not isinstance(other, CoordMap):
-            raise TypeError(f"Cannot compare ({type(self)}) and ({type(other)})")
-
-        return ndarray_lt(self.projection, other.projection) and ndarray_lt(
-            self.offset, other.offset
         )
 
     @property
@@ -204,64 +229,66 @@ class CoordMap(FrozenDoc):
     def out_dim(self) -> int:
         return self.projection.shape[1]
 
+    @property
+    def constant(self) -> bool:
+        return (self.projection == 0).all()
+
     def __call__(self, coords) -> np.ndarray:
         return np.matmul(coords, self.projection) + self.offset
 
     def marginal_strides(self) -> np.ndarray:
-        return self(np.identity(self.in_dim, dtype=np.int64))
+        "The marginal strides are the projection."
+        return self.projection
 
 
 @dataclass
-@functools.total_ordering
-class RangeMap(FrozenDoc):
-    coord_map: CoordMap
+class ZRangeMap(FrozenDoc):
+    zaffine_map: ZAffineMap
     shape: ZArray
 
-    def __init__(self, coord_map: CoordMap, shape):
+    def __init__(self, zaffine_map: ZAffineMap, shape):
         with self._thaw_context():
-            self.coord_map = coord_map
-            self.shape = as_zarray(shape, ndim=1, immutable=True)
+            self.zaffine_map = zaffine_map
+            self.shape = as_zarray(
+                shape,
+                ndim=1,
+                immutable=True,
+            )
+
+        if self.zaffine_map.out_dim != self.shape.shape[0]:
+            raise ValueError(
+                f"Coord map out ndim ({self.zaffine_map.out_dim}) != shape ndim ({self.shape.shape[0]})"
+            )
 
     def __hash__(self) -> int:
-        return hash(self.coord_map) ^ np_hash(self.shape)
+        return hash(self.zaffine_map) ^ np_hash(self.shape)
 
     def __eq__(self, other) -> bool:
-        if not isinstance(other, RangeMap):
+        if not isinstance(other, ZRangeMap):
             return False
 
         return all(
             (
-                self.coord_map == other.coord_map,
+                self.zaffine_map == other.zaffine_map,
                 np.array_equal(self.shape, other.shape),
             )
         )
-
-    def __lt__(self, other) -> bool:
-        if not isinstance(other, RangeMap):
-            raise TypeError(f"Cannot compare ({type(self)}) and ({type(other)})")
-
-        return (self.coord_map < other.coord_map) and ndarray_lt(
-            self.shape, other.shape
-        )
-
-    def point_to_range(self, coord) -> ZRange:
-        start = self.coord_map(coord)
-        return ZRange(start=start, end=start + self.shape)
-
-    def marginal_strides(self) -> np.ndarray:
-        return self.coord_map.marginal_strides()
 
     def marginal_overlap(self) -> np.ndarray:
         """
         Returns the marginal shape overlap of strides along each dim.
         """
-        return (self.coord_map.marginal_strides() - self.shape).clip(min=0)
+        return (self.zaffine_map.marginal_strides() - self.shape).clip(min=0)
 
     def marginal_waste(self) -> np.ndarray:
         """
         Returns the marginal waste of strides along each dim.
         """
-        return (self.coord_map.marginal_strides() - self.shape).clip(max=0).abs()
+        return (self.zaffine_map.marginal_strides() - self.shape).clip(max=0).abs()
+
+    def point_to_range(self, coord) -> ZRange:
+        start = self.zaffine_map(coord)
+        return ZRange(start=start, end=start + self.shape)
 
     def range_to_range(self, zrange: ZRange) -> ZRange:
         assert not zrange.empty
@@ -275,7 +302,7 @@ class RangeMap(FrozenDoc):
         # We only really care as ndim grows.
 
         corners = sorted(
-            self.coord_map(zrange.inclusive_corners()),
+            self.zaffine_map(zrange.inclusive_corners()),
             key=lambda x: x.tolist(),
         )
 

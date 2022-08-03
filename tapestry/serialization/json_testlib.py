@@ -16,12 +16,11 @@ def assert_json_serializable_roundtrip(actual, json_data) -> None:
         hamcrest.instance_of(tapestry.serialization.json.JsonSerializable),
     )
 
-    eggs.assert_match(
-        actual.dump_json_data(),
-        json_data,
-    )
+    json_1st_gen = actual.dump_json_data()
+    deserialized = type(actual).load_json_data(json_1st_gen)
+    json_2nd_gen = deserialized.dump_json_data()
 
     eggs.assert_match(
-        type(actual).load_json_data(json_data),
-        actual,
+        json_2nd_gen,
+        json_data,
     )

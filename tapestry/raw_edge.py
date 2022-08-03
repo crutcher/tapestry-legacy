@@ -5,7 +5,7 @@ from typing import Dict, List, Optional
 from marshmallow_dataclass import dataclass
 
 from tapestry.serialization.json import JsonSerializable
-from tapestry.zspace import CoordMap, RangeMap, ZRange
+from tapestry.zspace import ZAffineMap, ZRange, ZRangeMap
 
 
 @dataclass
@@ -27,7 +27,7 @@ class TensorValue(TensorSource):
 class TensorView(TensorSource):
     sources: List[TensorSource]
     concat_dim: int = 0
-    coord_map: Optional[CoordMap] = None
+    coord_map: Optional[ZAffineMap] = None
 
 
 @dataclass
@@ -46,15 +46,15 @@ class BlockOperation(OperationNode):
 def raw():
     i = ZRange([3, 4], start=[0, 1])
 
-    m = CoordMap(
+    m = ZAffineMap(
         projection=[[1, 0], [0, 1]],
         offset=[3, 4],
     )
 
     m(i.inclusive_corners())
 
-    r = RangeMap(
-        coord_map=m,
+    r = ZRangeMap(
+        zaffine_map=m,
         shape=[1, 2],
     )
 
