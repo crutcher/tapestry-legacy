@@ -6,7 +6,7 @@ from marshmallow import fields
 from marshmallow_dataclass import NewType, dataclass
 
 from tapestry.class_utils import Frozen
-from tapestry.numpy_utils import as_zarray, ndarray_hash, ndarry_lt
+from tapestry.numpy_utils import as_zarray, ndarray_hash, ndarray_lt
 from tapestry.serialization.json import JsonSerializable
 
 
@@ -109,10 +109,10 @@ class ZRange(FrozenDoc):
         if not isinstance(other, ZRange):
             raise TypeError(f"Cannot compare ({type(self)}) and ({type(other)})")
 
-        if ndarry_lt(self.start, other.start):
+        if ndarray_lt(self.start, other.start):
             return True
 
-        return np.array_equal(self.start, other.start) and ndarry_lt(
+        return np.array_equal(self.start, other.start) and ndarray_lt(
             self.end, other.end
         )
 

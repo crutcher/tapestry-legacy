@@ -33,59 +33,15 @@ def as_zarray(val, *, ndim=None, immutable=False) -> np.ndarray:
     return arr
 
 
-def _zip_lt(a, b) -> bool:
-    k_a = len(a)
-    k_b = len(b)
-    if k_a < k_b:
-        return True
-    if k_a > k_b:
-        return False
-
-    for x, y in zip(a, b):
-        if x < y:
-            return True
-
-    return False
-
-
-def ndarry_lt(a: np.ndarray, b: np.ndarray) -> bool:
+def ndarray_lt(a: np.ndarray, b: np.ndarray) -> bool:
     """
     Establish a tuple-like less than (<) ordering between numpy tuples.
-
-    Equivalent to:
-
-    >>> a.tolist() < b.tolist()
     """
-    if a.shape != b.shape:
-        return _zip_lt(a.shape, b.shape)
-
-    return _zip_lt(a.flat, b.flat)
+    return a.tolist() < b.tolist()
 
 
-def _zip_le(a, b) -> bool:
-    k_a = len(a)
-    k_b = len(b)
-    if k_a < k_b:
-        return True
-    if k_a > k_b:
-        return False
-
-    for x, y in zip(a, b):
-        if x <= y:
-            return True
-
-    return False
-
-
-def ndarry_le(a: np.ndarray, b: np.ndarray) -> bool:
+def ndarray_le(a: np.ndarray, b: np.ndarray) -> bool:
     """
     Establish a tuple-like less than or equal (<=) ordering between numpy tuples.
-
-    Equivalent to:
-
-    >>> a.tolist() <= b.tolist()
     """
-    if a.shape != b.shape:
-        return _zip_lt(a.shape, b.shape)
-
-    return _zip_le(a.flat, b.flat)
+    return a.tolist() <= b.tolist()

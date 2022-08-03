@@ -1,7 +1,13 @@
 import hamcrest
 import numpy as np
 
-from tapestry.numpy_utils import as_zarray, make_ndarray_immutable, ndarray_hash
+from tapestry.numpy_utils import (
+    as_zarray,
+    make_ndarray_immutable,
+    ndarray_hash,
+    ndarray_le,
+    ndarray_lt,
+)
 from tapestry.testlib import eggs, np_eggs
 
 
@@ -63,4 +69,57 @@ def test_as_zarray():
         lambda: as_zarray([3.5]),
         ValueError,
         "rounding error",
+    )
+
+
+def test_ndarray_lt():
+    eggs.assert_true(
+        ndarray_lt(
+            np.array([1, 2, 1]),
+            np.array([1, 3, 4]),
+        )
+    )
+
+    eggs.assert_true(
+        ndarray_lt(
+            np.array([1, 2, 1]),
+            np.array([1, 2, 1, 0]),
+        )
+    )
+
+    eggs.assert_false(
+        ndarray_lt(
+            np.array([8, 0, 9, 7]),
+            np.array([5, 1, 5, 7]),
+        )
+    )
+
+
+def test_ndarray_le():
+    eggs.assert_true(
+        ndarray_le(
+            np.array([1, 2, 1]),
+            np.array([1, 3, 4]),
+        )
+    )
+
+    eggs.assert_true(
+        ndarray_le(
+            np.array([1, 2, 1]),
+            np.array([1, 2, 1]),
+        )
+    )
+
+    eggs.assert_true(
+        ndarray_le(
+            np.array([1, 2, 1]),
+            np.array([1, 2, 1, 0]),
+        )
+    )
+
+    eggs.assert_true(
+        ndarray_le(
+            np.array([6, 8, 6, 0]),
+            np.array([8, 5, 4, 4]),
+        )
     )
