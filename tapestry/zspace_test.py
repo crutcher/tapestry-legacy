@@ -401,3 +401,46 @@ class ZRangeMapTest(unittest.TestCase):
                 end=[7, 3, 6],
             ),
         )
+
+    def test_range_to_bounding_range(self):
+        rm = ZRangeMap(
+            zaffine_map=ZAffineMap(
+                projection=[[-2, 0, 1], [0, 1, 1]],
+                offset=[-1, -1, 0],
+            ),
+            shape=[1, 1, 1],
+        )
+        eggs.assert_match(
+            rm.range_to_bounding_range(
+                ZRange(start=[1, 1], end=[3, 2]),
+            ),
+            ZRange(
+                start=[-5, 0, 3],
+                end=[-2, 1, 3],
+            ),
+        )
+
+    def test_marginal(self):
+        rm = ZRangeMap(
+            zaffine_map=ZAffineMap(
+                projection=[[1, 0, 1], [0, 2, 1]],
+                offset=[0, 0, 0],
+            ),
+            shape=[1, 1, 4],
+        )
+
+        np_eggs.assert_ndarray_equals(
+            rm.marginal_overlap(),
+            [
+                [0, 1, 3],
+                [1, 0, 3],
+            ],
+        )
+
+        np_eggs.assert_ndarray_equals(
+            rm.marginal_waste(),
+            [
+                [0, 0, 0],
+                [0, 1, 0],
+            ],
+        )

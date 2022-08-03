@@ -324,11 +324,10 @@ class ZRangeMap(FrozenDoc):
         """
         Returns the marginal shape overlap of strides along each dim.
         """
-        return (self.zaffine_map.marginal_strides() - self.shape).clip(min=0)
+        return (self.shape - self.zaffine_map.marginal_strides()).clip(min=0)
 
     def marginal_waste(self) -> np.ndarray:
         """
         Returns the marginal waste of strides along each dim.
         """
-        return (self.zaffine_map.marginal_strides() - self.shape).clip(max=0).abs()
-
+        return (self.zaffine_map.marginal_strides() - self.shape).clip(min=0)
