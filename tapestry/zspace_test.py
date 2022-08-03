@@ -151,13 +151,13 @@ class ZRangeTest(unittest.TestCase):
     def test_inclusive_corners_empty(self) -> None:
         r = ZRange(start=[2, 3], end=[2, 3])
         eggs.assert_match(
-            r.inclusive_corners(),
+            r.inclusive_corners,
             hamcrest.empty(),
         )
 
     def test_inclusive_corners(self) -> None:
         eggs.assert_match(
-            ZRange([1, 2, 3]).inclusive_corners(),
+            ZRange([1, 2, 3]).inclusive_corners,
             hamcrest.contains_exactly(
                 np_eggs.matches_ndarray([0, 0, 0]),
                 np_eggs.matches_ndarray([0, 0, 2]),
@@ -402,7 +402,7 @@ class ZRangeMapTest(unittest.TestCase):
             ),
         )
 
-    def test_range_to_bounding_range(self):
+    def test_call(self):
         rm = ZRangeMap(
             zaffine_map=ZAffineMap(
                 projection=[[-2, 0, 1], [0, 1, 1]],
@@ -411,7 +411,7 @@ class ZRangeMapTest(unittest.TestCase):
             shape=[1, 1, 1],
         )
         eggs.assert_match(
-            rm.range_to_bounding_range(
+            rm(
                 ZRange(start=[1, 1], end=[3, 2]),
             ),
             ZRange(

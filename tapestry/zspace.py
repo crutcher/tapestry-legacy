@@ -126,31 +126,32 @@ class ZRange(FrozenDoc):
             self.end, other.end
         )
 
-    @property
+    @functools.cached_property
     def ndim(self) -> int:
         "The number of dimensions of the ZSpace coordinate."
         return len(self.start)
 
-    @property
+    @functools.cached_property
     def shape(self) -> np.ndarray:
         "The shape of the range."
         return self.end - self.start
 
-    @property
+    @functools.cached_property
     def size(self) -> int:
         "The size of the range."
         return self.shape.prod()
 
-    @property
+    @functools.cached_property
     def empty(self) -> bool:
         "Is the range empty?"
         return self.size == 0
 
-    @property
+    @functools.cached_property
     def nonempty(self) -> bool:
         "Is the range non-empty?"
         return not self.empty
 
+    @functools.cached_property
     def inclusive_corners(self) -> List[np.ndarray]:
         """
         Every inclusive corner in the range.
@@ -182,6 +183,8 @@ class ZAffineMap(FrozenDoc):
     """
     Affine ℤ-Space map from one coordinate space to another.
     """
+
+    __slots__ = ("projection", "offset")
 
     projection: ZArray
     """The projection matrix."""
@@ -221,15 +224,15 @@ class ZAffineMap(FrozenDoc):
             )
         )
 
-    @property
+    @functools.cached_property
     def in_dim(self) -> int:
         return self.projection.shape[0]
 
-    @property
+    @functools.cached_property
     def out_dim(self) -> int:
         return self.projection.shape[1]
 
-    @property
+    @functools.cached_property
     def constant(self) -> bool:
         return (self.projection == 0).all()
 
@@ -243,6 +246,12 @@ class ZAffineMap(FrozenDoc):
 
 @dataclass
 class ZRangeMap(FrozenDoc):
+    """
+    Map from ZRange in in_dim, to ZRange in out_dim.
+    """
+
+    __slots__ = ("zaffine_map", "shape")
+
     zaffine_map: ZAffineMap
     shape: ZArray
 
@@ -274,29 +283,45 @@ class ZRangeMap(FrozenDoc):
             )
         )
 
-    @property
+    @functools.cached_property
     def in_dim(self) -> int:
         return self.zaffine_map.in_dim
 
-    @property
+    @functools.cached_property
     def out_dim(self) -> int:
         return self.zaffine_map.out_dim
 
-    @property
+    @functools.cached_property
     def constant(self) -> bool:
         return self.zaffine_map.constant
 
     def point_to_range(self, coord) -> ZRange:
+        """
+        Map a single point in in_dim to its bounding ZRange in out_dim.
+        """
+        coord = as_zarray(coord)
+
+        if coord.shape != (self.in_dim,):
+            raise ValueError(
+                f"Coord shape {coord.shape} != ZRangeMap in_dim ({self.in_dim},)"
+            )
+
         start = self.zaffine_map(coord)
+
         return ZRange(start=start, end=start + self.shape)
 
-    def range_to_bounding_range(self, zrange: ZRange) -> ZRange:
+    def __call__(self, zrange: ZRange) -> ZRange:
         """
         Map a range in in_dim to the enclosing bounding range in out_dim.
 
         This will be the coherent union of mapping `point_to_range()` for each
         point; and may contain extra points between mapped shapes.
         """
+        if zrange.ndim != self.in_dim:
+            raise ValueError(
+                f"ZRange ndim ({zrange.ndim}) != ZRangeMap in_dim ({self.in_dim})"
+            )
+
         assert not zrange.empty
 
         # FIXME: this is dumb.
@@ -308,7 +333,7 @@ class ZRangeMap(FrozenDoc):
         # We only really care as ndim grows.
 
         corners = sorted(
-            self.zaffine_map(zrange.inclusive_corners()),
+            self.zaffine_map(zrange.inclusive_corners),
             key=lambda x: x.tolist(),
         )
 
@@ -320,12 +345,14 @@ class ZRangeMap(FrozenDoc):
             end=greatest_start + self.shape,
         )
 
+    @functools.cache
     def marginal_overlap(self) -> np.ndarray:
         """
         Returns the marginal shape overlap of strides along each dim.
         """
         return (self.shape - self.zaffine_map.marginal_strides()).clip(min=0)
 
+    @functools.cache
     def marginal_waste(self) -> np.ndarray:
         """
         Returns the marginal waste of strides along each dim.
