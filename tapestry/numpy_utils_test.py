@@ -1,7 +1,7 @@
 import hamcrest
 import numpy as np
 
-from tapestry.numpy_util import as_zarray, np_hash, np_immutable_guard
+from tapestry.numpy_utils import as_zarray, np_hash, np_immutable_guard
 from tapestry.testlib import eggs, np_eggs
 
 

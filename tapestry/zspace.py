@@ -6,18 +6,8 @@ from marshmallow import fields
 from marshmallow_dataclass import NewType, dataclass
 
 from tapestry.class_utils import Frozen
-from tapestry.numpy_util import as_zarray, np_hash
+from tapestry.numpy_utils import as_zarray, ndarry_lt, np_hash
 from tapestry.serialization.json import JsonSerializable
-
-
-def _ndarray_lt(a, b) -> bool:
-    """Establish a less than (<) ordering between numpy tuples."""
-    return tuple(a.flat) < tuple(b.flat)
-
-
-def _ndarray_le(a, b) -> bool:
-    """Establish a less than (<) ordering between numpy tuples."""
-    return tuple(a.flat) <= tuple(b.flat)
 
 
 class ZArrayField(fields.Field):
@@ -119,10 +109,10 @@ class ZRange(FrozenDoc):
         if not isinstance(other, ZRange):
             raise TypeError(f"Cannot compare ({type(self)}) and ({type(other)})")
 
-        if _ndarray_lt(self.start, other.start):
+        if ndarry_lt(self.start, other.start):
             return True
 
-        return np.array_equal(self.start, other.start) and _ndarray_lt(
+        return np.array_equal(self.start, other.start) and ndarry_lt(
             self.end, other.end
         )
 
