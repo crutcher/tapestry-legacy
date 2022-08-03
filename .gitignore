@@ -17,7 +17,9 @@ logs/
 
 .pytest_cache
 
+# mypy artifacts
 /.mypy_cache
+.dmypy.json
 
 # pyre database
 /.pyre

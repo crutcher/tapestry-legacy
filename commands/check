@@ -14,7 +14,7 @@ fi
 
 echo "Code Quality Scans ..."
 
-mypy --incremental "${TARGETS[@]}"
+dmypy run -- "${TARGETS[@]}"
 
 # does not like pytorch
 # pyre incremental
