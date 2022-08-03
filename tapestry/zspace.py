@@ -274,23 +274,29 @@ class ZRangeMap(FrozenDoc):
             )
         )
 
-    def marginal_overlap(self) -> np.ndarray:
-        """
-        Returns the marginal shape overlap of strides along each dim.
-        """
-        return (self.zaffine_map.marginal_strides() - self.shape).clip(min=0)
+    @property
+    def in_dim(self) -> int:
+        return self.zaffine_map.in_dim
 
-    def marginal_waste(self) -> np.ndarray:
-        """
-        Returns the marginal waste of strides along each dim.
-        """
-        return (self.zaffine_map.marginal_strides() - self.shape).clip(max=0).abs()
+    @property
+    def out_dim(self) -> int:
+        return self.zaffine_map.out_dim
+
+    @property
+    def constant(self) -> bool:
+        return self.zaffine_map.constant
 
     def point_to_range(self, coord) -> ZRange:
         start = self.zaffine_map(coord)
         return ZRange(start=start, end=start + self.shape)
 
-    def range_to_range(self, zrange: ZRange) -> ZRange:
+    def range_to_bounding_range(self, zrange: ZRange) -> ZRange:
+        """
+        Map a range in in_dim to the enclosing bounding range in out_dim.
+
+        This will be the coherent union of mapping `point_to_range()` for each
+        point; and may contain extra points between mapped shapes.
+        """
         assert not zrange.empty
 
         # FIXME: this is dumb.
@@ -313,3 +319,16 @@ class ZRangeMap(FrozenDoc):
             start=least_start,
             end=greatest_start + self.shape,
         )
+
+    def marginal_overlap(self) -> np.ndarray:
+        """
+        Returns the marginal shape overlap of strides along each dim.
+        """
+        return (self.zaffine_map.marginal_strides() - self.shape).clip(min=0)
+
+    def marginal_waste(self) -> np.ndarray:
+        """
+        Returns the marginal waste of strides along each dim.
+        """
+        return (self.zaffine_map.marginal_strides() - self.shape).clip(max=0).abs()
+

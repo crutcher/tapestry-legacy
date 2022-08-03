@@ -106,6 +106,7 @@ class ZRangeTest(unittest.TestCase):
         start = np.array([0, 1])
         end = np.array([4, 5])
 
+        # verify that hash and eq work for all embedded properties.
         _assert_hash_eq(
             ZRange(start=start, end=end),
             ZRange(start=start + 1, end=end),
@@ -219,6 +220,7 @@ class ZAffineMapTest(unittest.TestCase):
         projection = np.array([[2, 0], [0, 1]])
         offset = np.array([-5, 3])
 
+        # verify that hash and eq work for all embedded properties.
         _assert_hash_eq(
             ZAffineMap(projection=projection, offset=offset),
             ZAffineMap(projection=projection + 1, offset=offset),
@@ -313,11 +315,28 @@ class ZRangeMapTest(unittest.TestCase):
             },
         )
 
+    def test_props(self):
+        eggs.assert_match(
+            ZRangeMap(
+                zaffine_map=ZAffineMap(
+                    projection=[[2, 0, 1], [0, 1, 1]],
+                    offset=[-5, 3, 0],
+                ),
+                shape=[2, 2, 1],
+            ),
+            hamcrest.has_properties(
+                in_dim=2,
+                out_dim=3,
+                constant=False,
+            ),
+        )
+
     def test_hash_eq(self) -> None:
         projection = np.array([[2, 0], [0, 1]])
         offset = np.array([-5, 3])
         shape = np.array([2, 2])
 
+        # verify that hash and eq work for all embedded properties.
         _assert_hash_eq(
             ZRangeMap(
                 zaffine_map=ZAffineMap(
@@ -364,5 +383,21 @@ class ZRangeMapTest(unittest.TestCase):
                     offset=offset,
                 ),
                 shape=shape + 1,
+            ),
+        )
+
+    def test_point_to_range(self):
+        rm = ZRangeMap(
+            zaffine_map=ZAffineMap(
+                projection=[[2, 0, 1], [0, 1, 1]],
+                offset=[-1, -1, 0],
+            ),
+            shape=[2, 2, 1],
+        )
+        eggs.assert_match(
+            rm.point_to_range([3, 2]),
+            ZRange(
+                start=[5, 1, 5],
+                end=[7, 3, 6],
             ),
         )

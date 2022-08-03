@@ -58,7 +58,7 @@ def raw():
         shape=[1, 2],
     )
 
-    w = r.range_to_range(i)
+    w = r.range_to_bounding_range(i)
     print(w)
 
 
