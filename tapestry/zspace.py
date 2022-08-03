@@ -5,9 +5,8 @@ import numpy as np
 from marshmallow import fields
 from marshmallow_dataclass import NewType, dataclass
 
-from tapestry.class_utils import Frozen
 from tapestry.numpy_utils import as_zarray, ndarray_hash, ndarray_lt
-from tapestry.serialization.json import JsonSerializable
+from tapestry.serialization.frozendoc import FrozenDoc
 
 
 class ZArrayField(fields.Field):
@@ -46,10 +45,6 @@ Usage:
 ... class Example:
 ...     coords: ZArray
 """
-
-
-class FrozenDoc(JsonSerializable, Frozen):
-    """Aggregate JsonSerializable, Frozen base class."""
 
 
 @dataclass

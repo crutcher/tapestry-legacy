@@ -1,4 +1,4 @@
-from typing import Any, Optional, Type, TypeVar
+from typing import Any, ClassVar, Optional, Type, TypeVar
 
 import marshmallow
 
@@ -6,6 +6,8 @@ C = TypeVar("C", bound="JsonSerializable")
 
 
 class JsonSerializable:
+    Schema: ClassVar[Type[marshmallow.Schema]] = marshmallow.Schema
+
     class Meta:
         ordered = True
 
