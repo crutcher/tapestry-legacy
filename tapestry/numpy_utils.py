@@ -1,11 +1,11 @@
 import numpy as np
 
 
-def np_hash(arr: np.ndarray) -> int:
+def ndarray_hash(arr: np.ndarray) -> int:
     return hash(arr.tobytes())
 
 
-def np_immutable_guard(*args: np.ndarray) -> None:
+def make_ndarray_immutable(*args: np.ndarray) -> None:
     """
     Mark numpy arrays as immutable.
     """
@@ -28,7 +28,7 @@ def as_zarray(val, *, ndim=None, immutable=False) -> np.ndarray:
             )
 
     if immutable:
-        np_immutable_guard(arr)
+        make_ndarray_immutable(arr)
 
     return arr
 

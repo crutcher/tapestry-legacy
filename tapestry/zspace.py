@@ -6,7 +6,7 @@ from marshmallow import fields
 from marshmallow_dataclass import NewType, dataclass
 
 from tapestry.class_utils import Frozen
-from tapestry.numpy_utils import as_zarray, ndarry_lt, np_hash
+from tapestry.numpy_utils import as_zarray, ndarray_hash, ndarry_lt
 from tapestry.serialization.json import JsonSerializable
 
 
@@ -92,7 +92,7 @@ class ZRange(FrozenDoc):
             raise ValueError(f"start ({self.start}) is not >= end ({self.end})")
 
     def __hash__(self) -> int:
-        return np_hash(self.start) ^ np_hash(self.end)
+        return ndarray_hash(self.start) ^ ndarray_hash(self.end)
 
     def __eq__(self, other) -> bool:
         if not isinstance(other, ZRange):
@@ -201,7 +201,7 @@ class ZAffineMap(FrozenDoc):
             )
 
     def __hash__(self) -> int:
-        return np_hash(self.projection) ^ np_hash(self.offset)
+        return ndarray_hash(self.projection) ^ ndarray_hash(self.offset)
 
     def __eq__(self, other) -> bool:
         if not isinstance(other, ZAffineMap):
@@ -260,7 +260,7 @@ class ZRangeMap(FrozenDoc):
             )
 
     def __hash__(self) -> int:
-        return hash(self.zaffine_map) ^ np_hash(self.shape)
+        return hash(self.zaffine_map) ^ ndarray_hash(self.shape)
 
     def __eq__(self, other) -> bool:
         if not isinstance(other, ZRangeMap):

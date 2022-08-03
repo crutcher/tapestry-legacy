@@ -1,23 +1,23 @@
 import hamcrest
 import numpy as np
 
-from tapestry.numpy_utils import as_zarray, np_hash, np_immutable_guard
+from tapestry.numpy_utils import as_zarray, make_ndarray_immutable, ndarray_hash
 from tapestry.testlib import eggs, np_eggs
 
 
-def test_np_hash():
+def test_ndarray_hash():
     eggs.assert_match(
-        np_hash(np.array([[2, 3], [4, 5]])),
-        np_hash(np.array([[2, 3], [4, 5]])),
+        ndarray_hash(np.array([[2, 3], [4, 5]])),
+        ndarray_hash(np.array([[2, 3], [4, 5]])),
     )
 
     eggs.assert_match(
-        np_hash(np.array([[2, 3], [4, 5]])),
-        hamcrest.not_(np_hash(np.array([[2, 3], [9, 8]]))),
+        ndarray_hash(np.array([[2, 3], [4, 5]])),
+        hamcrest.not_(ndarray_hash(np.array([[2, 3], [9, 8]]))),
     )
 
 
-def test_np_immutable_guard():
+def test_make_ndarray_immutable():
     x = np.array([2, 3])
     x[0] = 7
 
@@ -26,7 +26,7 @@ def test_np_immutable_guard():
         [7, 3],
     )
 
-    np_immutable_guard(x)
+    make_ndarray_immutable(x)
 
     eggs.assert_raises(
         lambda: x.__setitem__(0, 9),
