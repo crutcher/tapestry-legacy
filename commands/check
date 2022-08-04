@@ -14,7 +14,7 @@ fi
 
 echo "Code Quality Scans ..."
 
-dmypy run -- "${TARGETS[@]}"
+dmypy run --timeout 1200 -- "${TARGETS[@]}"
 
 # does not like pytorch
 # pyre incremental
