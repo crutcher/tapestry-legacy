@@ -4,7 +4,7 @@ import hamcrest
 import numpy as np
 from marshmallow_dataclass import dataclass
 
-from tapestry.serialization.json_serializable import JsonSerializable
+from tapestry.serialization.json_serializable import JsonLoadable
 from tapestry.serialization.json_testlib import assert_json_serializable_roundtrip
 from tapestry.testlib import eggs, np_eggs
 from tapestry.zspace import ZAffineMap, ZArray, ZRange, ZRangeMap
@@ -32,7 +32,7 @@ def _assert_hash_eq(a, b):
 class ZArrayTest(unittest.TestCase):
     def test_zarray(self):
         @dataclass
-        class Example(JsonSerializable):
+        class Example(JsonLoadable):
             arr: ZArray
 
         actual = Example(np.array([3, 2]))

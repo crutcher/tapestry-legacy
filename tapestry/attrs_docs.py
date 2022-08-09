@@ -7,12 +7,12 @@ import marshmallow_dataclass
 from marshmallow import fields
 from marshmallow_oneofschema import OneOfSchema
 
-from tapestry.serialization.json_serializable import JsonDumpable, JsonSerializable
+from tapestry.serialization.json_serializable import JsonDumpable, JsonLoadable
 from tapestry.type_utils import ensure_uuid
 
 
 @marshmallow_dataclass.dataclass
-class NodeAttrsDoc(JsonSerializable):
+class NodeAttrsDoc(JsonLoadable):
     node_id: uuid.UUID
     name: str
 

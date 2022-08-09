@@ -1,6 +1,6 @@
 from tapestry.class_utils import Frozen
-from tapestry.serialization.json_serializable import JsonSerializable
+from tapestry.serialization.json_serializable import JsonLoadable
 
 
-class FrozenDoc(JsonSerializable, Frozen):
-    """Aggregate JsonSerializable, Frozen base class."""
+class FrozenDoc(JsonLoadable, Frozen):
+    """Aggregate JsonLoadable, Frozen base class."""

@@ -2,7 +2,7 @@ from typing import Any, ClassVar, Optional, Type, TypeVar
 
 import marshmallow
 
-C = TypeVar("C", bound="JsonSerializable")
+C = TypeVar("C", bound="JsonLoadable")
 
 
 class JsonDumpable:
@@ -29,7 +29,7 @@ class JsonDumpable:
         return self.dump_json_str(indent=2)
 
 
-class JsonSerializable(JsonDumpable):
+class JsonLoadable(JsonDumpable):
     Schema: ClassVar[Type[marshmallow.Schema]] = marshmallow.Schema
 
     @classmethod
