@@ -1,13 +1,13 @@
 import uuid
 from dataclasses import dataclass
-from typing import Dict, Optional, Type, cast
+from typing import Dict, Iterable, Optional, Type, cast
 
 import marshmallow
 import marshmallow_dataclass
 from marshmallow import fields
 from marshmallow_oneofschema import OneOfSchema
 
-from tapestry.serialization.json_serializable import JsonSerializable
+from tapestry.serialization.json_serializable import JsonDumpable, JsonSerializable
 from tapestry.type_utils import ensure_uuid
 
 
@@ -72,26 +72,8 @@ class ExternalTensorValueAttrs(TensorValueAttrs):
         self.storage = storage
 
 
-class NodeAttrsDocSchema(OneOfSchema):
-    """
-    Polymorphic type-dispatch wrapper for NodeAttrDoc subclasses.
-    """
-
-    type_schemas = {
-        cls.__name__: cast(Type[NodeAttrsDoc], cls).Schema
-        for cls in [
-            NodeAttrsDoc,
-            TensorSourceAttrs,
-            TensorValueAttrs,
-            ExternalTensorValueAttrs,
-        ]
-    }
-
-    type_field = "__type__"
-
-
 @dataclass
-class OpGraphDoc(JsonSerializable):
+class OpGraphDoc(JsonDumpable):
     # This class has special handling.
     #
     # Note that this is a normal python dataclass,
@@ -102,15 +84,46 @@ class OpGraphDoc(JsonSerializable):
 
     nodes: Dict[uuid.UUID, NodeAttrsDoc]
 
-    class Schema(marshmallow.Schema):
-        nodes = fields.Dict(
-            fields.UUID,
-            fields.Nested(NodeAttrsDocSchema),
-        )
+    @classmethod
+    def build_load_schema(
+        cls,
+        node_types: Iterable[Type[NodeAttrsDoc]],
+    ) -> marshmallow.Schema:
+        """
+        Builds a load schema for a collection of node types.
 
-        @marshmallow.post_load
-        def post_load(self, data, **kwargs):
-            return OpGraphDoc(**data)
+        :param node_types: the node types to load.
+        :return: a Schema.
+        """
+
+        class S(OneOfSchema):
+            """
+            Polymorphic type-dispatch wrapper for NodeAttrDoc subclasses.
+            """
+
+            type_field = "__type__"
+
+            type_schemas = {
+                cls.__name__: cast(Type[NodeAttrsDoc], cls).get_load_schema()
+                for cls in node_types
+            }
+
+        class G(marshmallow.Schema):
+            nodes = fields.Dict(
+                fields.UUID,
+                fields.Nested(S),
+            )
+
+            @marshmallow.post_load
+            def post_load(self, data, **kwargs):
+                return OpGraphDoc(**data)
+
+        return G()
+
+    def get_dump_schema(self) -> marshmallow.Schema:
+        return self.build_load_schema(
+            {type(n) for n in self.nodes.values()},
+        )
 
     def __init__(
         self,

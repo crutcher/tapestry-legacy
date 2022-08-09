@@ -4,6 +4,7 @@ from typing import Any, Dict
 
 from tapestry import attrs_docs
 from tapestry.serialization import json_testlib
+from tapestry.testlib import eggs
 
 
 class NodeAttrsDocTest(unittest.TestCase):
@@ -54,7 +55,7 @@ class ExternalTensorSourceAttrsTest(unittest.TestCase):
 
 
 class OpGraphDocTest(unittest.TestCase):
-    def test_json(self) -> None:
+    def test_schema(self) -> None:
         g = attrs_docs.OpGraphDoc()
         a = attrs_docs.ExternalTensorValueAttrs(
             name="A",
@@ -67,18 +68,37 @@ class OpGraphDocTest(unittest.TestCase):
         )
         g.add_node(b)
 
-        json_testlib.assert_json_serializable_roundtrip(
-            g,
-            {
-                "nodes": {
-                    str(a.node_id): {
-                        "__type__": "ExternalTensorValueAttrs",
-                        **a.dump_json_data(),
-                    },
-                    str(b.node_id): {
-                        "__type__": "TensorValueAttrs",
-                        **b.dump_json_data(),
-                    },
+        s = attrs_docs.OpGraphDoc.build_load_schema(
+            [
+                attrs_docs.TensorSourceAttrs,
+                attrs_docs.TensorValueAttrs,
+                attrs_docs.ExternalTensorValueAttrs,
+            ]
+        )
+
+        expected_json = {
+            "nodes": {
+                str(a.node_id): {
+                    "__type__": "ExternalTensorValueAttrs",
+                    **a.dump_json_data(),
+                },
+                str(b.node_id): {
+                    "__type__": "TensorValueAttrs",
+                    **b.dump_json_data(),
                 },
             },
+        }
+
+        eggs.assert_match(
+            s.dump(g),
+            expected_json,
+        )
+        eggs.assert_match(
+            g.dump_json_data(),
+            expected_json,
+        )
+
+        eggs.assert_match(
+            s.dump(s.load(s.dump(g))),
+            expected_json,
         )
