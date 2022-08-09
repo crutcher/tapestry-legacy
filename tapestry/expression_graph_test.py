@@ -166,7 +166,7 @@ class ExternalTensorValueTest(CommonNodeWrapperTestBase):
 
 class ExpressionGraph(unittest.TestCase):
     def test_list_nodes_of_type(self) -> None:
-        gdoc = attrs_docs.OpGraphDoc()
+        gdoc = attrs_docs.GraphDoc()
 
         adoc = attrs_docs.ExternalTensorValueAttrs(
             name="A",
@@ -206,7 +206,7 @@ class ExpressionGraph(unittest.TestCase):
         )
 
     def test_get_node(self) -> None:
-        gdoc = attrs_docs.OpGraphDoc()
+        gdoc = attrs_docs.GraphDoc()
 
         adoc = attrs_docs.ExternalTensorValueAttrs(
             name="A",

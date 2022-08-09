@@ -56,7 +56,7 @@ class ExternalTensorSourceAttrsTest(unittest.TestCase):
 
 class OpGraphDocTest(unittest.TestCase):
     def test_schema(self) -> None:
-        g = attrs_docs.OpGraphDoc()
+        g = attrs_docs.GraphDoc()
         a = attrs_docs.ExternalTensorValueAttrs(
             name="A",
             storage="pre:A",
@@ -68,7 +68,7 @@ class OpGraphDocTest(unittest.TestCase):
         )
         g.add_node(b)
 
-        s = attrs_docs.OpGraphDoc.build_load_schema(
+        s = attrs_docs.GraphDoc.build_load_schema(
             [
                 attrs_docs.TensorSourceAttrs,
                 attrs_docs.TensorValueAttrs,
@@ -104,7 +104,7 @@ class OpGraphDocTest(unittest.TestCase):
         )
 
     def test_assert_node_types(self) -> None:
-        g = attrs_docs.OpGraphDoc()
+        g = attrs_docs.GraphDoc()
         a = attrs_docs.ExternalTensorValueAttrs(
             name="A",
             storage="pre:A",

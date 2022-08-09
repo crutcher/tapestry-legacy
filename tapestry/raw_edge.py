@@ -1,4 +1,4 @@
-from tapestry.attrs_docs import ExternalTensorValueAttrs, OpGraphDoc, TensorValueAttrs
+from tapestry.attrs_docs import ExternalTensorValueAttrs, GraphDoc, TensorValueAttrs
 from tapestry.expression_graph import (
     ExpressionGraph,
     ExternalTensorValue,
@@ -8,7 +8,7 @@ from tapestry.expression_graph import (
 
 
 def raw():
-    gdoc = OpGraphDoc()
+    gdoc = GraphDoc()
 
     adoc = ExternalTensorValueAttrs(
         name="A",

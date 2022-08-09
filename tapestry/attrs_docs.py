@@ -74,7 +74,7 @@ class ExternalTensorValueAttrs(TensorValueAttrs):
 
 
 @dataclass
-class OpGraphDoc(JsonDumpable):
+class GraphDoc(JsonDumpable):
     # This class has special handling.
     #
     # Note that this is a normal python dataclass,
@@ -117,7 +117,7 @@ class OpGraphDoc(JsonDumpable):
 
             @marshmallow.post_load
             def post_load(self, data, **kwargs):
-                return OpGraphDoc(**data)
+                return GraphDoc(**data)
 
         return G()
 
@@ -150,7 +150,7 @@ class OpGraphDoc(JsonDumpable):
         node_types: Iterable[Type[NodeAttrsDoc]],
     ) -> None:
         """
-        Assert that the OpGraphDoc contains only the listed types.
+        Assert that the GraphDoc contains only the listed types.
 
         :param node_types: the node types.
         :raises ValueError: if there are type violations.

@@ -5,8 +5,8 @@ from typing import List, Optional, Type, TypeVar, Union
 
 from tapestry.attrs_docs import (
     ExternalTensorValueAttrs,
+    GraphDoc,
     NodeAttrsDoc,
-    OpGraphDoc,
     TensorSourceAttrs,
     TensorValueAttrs,
 )
@@ -184,14 +184,14 @@ class ExternalTensorValue(TensorValue):
 # See forward references:
 #  * NodeWrapper
 class ExpressionGraph:
-    doc: OpGraphDoc
+    doc: GraphDoc
 
     def __init__(
         self,
-        doc: Optional[OpGraphDoc] = None,
+        doc: Optional[GraphDoc] = None,
     ):
         if doc is None:
-            doc = OpGraphDoc()
+            doc = GraphDoc()
         self.doc = doc
 
     def __repr__(self):
