@@ -195,7 +195,7 @@ class ExpressionGraph:
         self.doc = doc
 
     def __repr__(self):
-        return f"ExpressionGraph(doc={repr(self.doc)})"
+        return f"{type(self).__name__}(doc={repr(self.doc)})"
 
     def __str__(self):
         return str(self.doc.pretty())
