@@ -1,5 +1,5 @@
 from tapestry.class_utils import Frozen
-from tapestry.serialization.json import JsonSerializable
+from tapestry.serialization.json_serializable import JsonSerializable
 
 
 class FrozenDoc(JsonSerializable, Frozen):

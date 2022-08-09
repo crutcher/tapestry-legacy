@@ -4,7 +4,7 @@ import hamcrest
 import numpy as np
 from marshmallow_dataclass import dataclass
 
-from tapestry.serialization.json import JsonSerializable
+from tapestry.serialization.json_serializable import JsonSerializable
 from tapestry.serialization.json_testlib import assert_json_serializable_roundtrip
 from tapestry.testlib import eggs, np_eggs
 from tapestry.zspace import ZAffineMap, ZArray, ZRange, ZRangeMap
