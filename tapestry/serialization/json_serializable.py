@@ -6,6 +6,9 @@ C = TypeVar("C", bound="JsonLoadable")
 
 
 class JsonDumpable:
+    """
+    Base class for marshmallow dumpable dataclasses.
+    """
     class Meta:
         ordered = True
 
@@ -30,6 +33,9 @@ class JsonDumpable:
 
 
 class JsonLoadable(JsonDumpable):
+    """
+    Base class for marshmallow loadable dataclasses.
+    """
     Schema: ClassVar[Type[marshmallow.Schema]] = marshmallow.Schema
 
     @classmethod
