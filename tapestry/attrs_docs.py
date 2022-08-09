@@ -75,13 +75,9 @@ class ExternalTensorValueAttrs(TensorValueAttrs):
 
 @dataclass
 class GraphDoc(JsonDumpable):
-    # This class has special handling.
-    #
-    # Note that this is a normal python dataclass,
-    # and it defines its schema directly.
-    #
-    # This is to trigger dump/load polymorphic dispatch for GraphNode;
-    # which uses OneOfSchema; and to build a schema which calls that correctly.
+    """
+    Serializable NodeAttrsDoc graph.
+    """
 
     nodes: Dict[uuid.UUID, NodeAttrsDoc]
 
@@ -97,7 +93,7 @@ class GraphDoc(JsonDumpable):
         :return: a Schema.
         """
 
-        class S(OneOfSchema):
+        class N(OneOfSchema):
             """
             Polymorphic type-dispatch wrapper for NodeAttrDoc subclasses.
             """
@@ -112,7 +108,7 @@ class GraphDoc(JsonDumpable):
         class G(marshmallow.Schema):
             nodes = fields.Dict(
                 fields.UUID,
-                fields.Nested(S),
+                fields.Nested(N),
             )
 
             @marshmallow.post_load
