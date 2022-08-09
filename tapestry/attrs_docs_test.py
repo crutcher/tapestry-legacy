@@ -1,6 +1,6 @@
 import unittest
 import uuid
-from typing import Any, Dict
+from typing import Any, Dict, Type
 
 from tapestry import attrs_docs
 from tapestry.serialization import json_testlib
@@ -8,48 +8,41 @@ from tapestry.testlib import eggs
 
 
 class NodeAttrsDocTest(unittest.TestCase):
-    DOC_CLASS = attrs_docs.NodeAttrsDoc
+    DOC_CLASS: Type[attrs_docs.NodeAttrsDoc] = attrs_docs.NodeAttrsDoc
+    """Overridable by subclasses."""
 
     def expected_json(self, node_id: uuid.UUID) -> Dict[str, Any]:
         return {
             "node_id": str(node_id),
-            "name": "foo",
+            "display_name": "foo",
         }
 
     def test_lifecycle(self) -> None:
-        node = self.DOC_CLASS(name="foo")
-
-        json_testlib.assert_json_serializable_roundtrip(
-            node,
-            self.expected_json(node.node_id),
-        )
-
         node_id = uuid.uuid4()
-        node = self.DOC_CLASS(
-            node_id=node_id,
-            name="foo",
-        )
+        json = self.expected_json(node_id)
+        node = self.DOC_CLASS.load_json_data(json)
+
         json_testlib.assert_json_serializable_roundtrip(
             node,
-            self.expected_json(node_id),
+            json,
         )
 
 
-class TensorSourceAttrsTest(unittest.TestCase):
+class TensorSourceAttrsTest(NodeAttrsDocTest):
     DOC_CLASS = attrs_docs.TensorSourceAttrs
 
 
-class TensorValueAttrsTest(unittest.TestCase):
+class TensorValueAttrsTest(NodeAttrsDocTest):
     DOC_CLASS = attrs_docs.TensorValueAttrs
 
 
-class ExternalTensorSourceAttrsTest(unittest.TestCase):
+class ExternalTensorSourceAttrsTest(NodeAttrsDocTest):
     DOC_CLASS = attrs_docs.ExternalTensorValueAttrs
 
     def expected_json(self, node_id: uuid.UUID) -> Dict[str, Any]:
         return {
             "node_id": str(node_id),
-            "name": "foo",
+            "display_name": "foo",
             "storage": "abc",
         }
 
@@ -58,13 +51,15 @@ class OpGraphDocTest(unittest.TestCase):
     def test_schema(self) -> None:
         g = attrs_docs.GraphDoc()
         a = attrs_docs.ExternalTensorValueAttrs(
-            name="A",
+            node_id=uuid.uuid4(),
+            display_name="A",
             storage="pre:A",
         )
         g.add_node(a)
 
         b = attrs_docs.TensorValueAttrs(
-            name="B",
+            node_id=uuid.uuid4(),
+            display_name="B",
         )
         g.add_node(b)
 
@@ -106,13 +101,15 @@ class OpGraphDocTest(unittest.TestCase):
     def test_assert_node_types(self) -> None:
         g = attrs_docs.GraphDoc()
         a = attrs_docs.ExternalTensorValueAttrs(
-            name="A",
+            node_id=uuid.uuid4(),
+            display_name="A",
             storage="pre:A",
         )
         g.add_node(a)
 
         b = attrs_docs.TensorValueAttrs(
-            name="B",
+            node_id=uuid.uuid4(),
+            display_name="B",
         )
         g.add_node(b)
 

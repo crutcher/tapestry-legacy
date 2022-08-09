@@ -11,13 +11,13 @@ def raw():
     gdoc = GraphDoc()
 
     adoc = ExternalTensorValueAttrs(
-        name="A",
+        display_name="A",
         storage="pre:A",
     )
     gdoc.add_node(adoc)
 
     bdoc = TensorValueAttrs(
-        name="B",
+        display_name="B",
     )
     gdoc.add_node(bdoc)
 

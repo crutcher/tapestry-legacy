@@ -9,68 +9,30 @@ from marshmallow_oneofschema import OneOfSchema
 from overrides import overrides
 
 from tapestry.serialization.json_serializable import JsonDumpable, JsonLoadable
-from tapestry.type_utils import ensure_uuid
 
 
 @marshmallow_dataclass.dataclass
 class NodeAttrsDoc(JsonLoadable):
     node_id: uuid.UUID
-    name: str
+    """Unique in a document."""
 
-    def __init__(
-        self,
-        *,
-        name: str,
-        node_id: Optional[uuid.UUID] = None,
-    ):
-        self.node_id = ensure_uuid(node_id)
-        self.name = name
+    display_name: str
+    """May be repeated in a document."""
 
 
 @marshmallow_dataclass.dataclass
 class TensorSourceAttrs(NodeAttrsDoc):
-    def __init__(
-        self,
-        *,
-        name: str,
-        node_id: Optional[uuid.UUID] = None,
-    ):
-        super().__init__(
-            name=name,
-            node_id=node_id,
-        )
+    pass
 
 
 @marshmallow_dataclass.dataclass
 class TensorValueAttrs(TensorSourceAttrs):
-    def __init__(
-        self,
-        *,
-        name: str,
-        node_id: Optional[uuid.UUID] = None,
-    ):
-        super().__init__(
-            name=name,
-            node_id=node_id,
-        )
+    pass
 
 
 @marshmallow_dataclass.dataclass
 class ExternalTensorValueAttrs(TensorValueAttrs):
     storage: str
-
-    def __init__(
-        self,
-        *,
-        name: str,
-        storage: str,
-        node_id: Optional[uuid.UUID] = None,
-    ):
-        super().__init__(
-            name=name,
-            node_id=node_id,
-        )
-        self.storage = storage
 
 
 @dataclass

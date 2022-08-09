@@ -32,7 +32,10 @@ class CommonNodeWrapperTestBase(unittest.TestCase):
         """
         Subclasses can override.
         """
-        return attrs_docs.NodeAttrsDoc(name="foo")
+        return attrs_docs.NodeAttrsDoc(
+            node_id=uuid.uuid4(),
+            display_name="foo",
+        )
 
     def test_common_construction(self) -> None:
         g = expression_graph.ExpressionGraph()
@@ -92,11 +95,11 @@ class NodeWrapperTest(CommonNodeWrapperTestBase):
 
         foo = attrs_docs.NodeAttrsDoc(
             node_id=uuid.uuid4(),
-            name="foo",
+            display_name="foo",
         )
         bar = attrs_docs.NodeAttrsDoc(
             node_id=uuid.uuid4(),
-            name="bar",
+            display_name="bar",
         )
 
         foo_node_1 = expression_graph.NodeWrapper(
@@ -139,7 +142,8 @@ class TensorSourceTest(CommonNodeWrapperTestBase):
     @overrides
     def example_doc(self) -> attrs_docs.NodeAttrsDoc:
         return attrs_docs.TensorSourceAttrs(
-            name="foo",
+            node_id=uuid.uuid4(),
+            display_name="foo",
         )
 
 
@@ -149,7 +153,8 @@ class TensorValueTest(CommonNodeWrapperTestBase):
     @overrides
     def example_doc(self) -> attrs_docs.NodeAttrsDoc:
         return attrs_docs.TensorValueAttrs(
-            name="foo",
+            node_id=uuid.uuid4(),
+            display_name="foo",
         )
 
 
@@ -159,7 +164,8 @@ class ExternalTensorValueTest(CommonNodeWrapperTestBase):
     @overrides
     def example_doc(self) -> attrs_docs.NodeAttrsDoc:
         return attrs_docs.ExternalTensorValueAttrs(
-            name="foo",
+            node_id=uuid.uuid4(),
+            display_name="foo",
             storage="abc",
         )
 
@@ -169,13 +175,15 @@ class ExpressionGraph(unittest.TestCase):
         gdoc = attrs_docs.GraphDoc()
 
         adoc = attrs_docs.ExternalTensorValueAttrs(
-            name="A",
+            node_id=uuid.uuid4(),
+            display_name="A",
             storage="pre:A",
         )
         gdoc.add_node(adoc)
 
         bdoc = attrs_docs.TensorValueAttrs(
-            name="B",
+            node_id=uuid.uuid4(),
+            display_name="B",
         )
         gdoc.add_node(bdoc)
 
@@ -209,13 +217,15 @@ class ExpressionGraph(unittest.TestCase):
         gdoc = attrs_docs.GraphDoc()
 
         adoc = attrs_docs.ExternalTensorValueAttrs(
-            name="A",
+            node_id=uuid.uuid4(),
+            display_name="A",
             storage="pre:A",
         )
         gdoc.add_node(adoc)
 
         bdoc = attrs_docs.TensorValueAttrs(
-            name="B",
+            node_id=uuid.uuid4(),
+            display_name="B",
         )
         gdoc.add_node(bdoc)
 
