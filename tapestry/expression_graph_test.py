@@ -152,3 +152,96 @@ class ExternalTensorValueTest(CommonNodeWrapperTestBase):
             name="foo",
             storage="abc",
         )
+
+
+class ExpressionGraph(unittest.TestCase):
+    def test_list_nodes_of_type(self) -> None:
+        gdoc = attrs_docs.OpGraphDoc()
+
+        adoc = attrs_docs.ExternalTensorValueAttrs(
+            name="A",
+            storage="pre:A",
+        )
+        gdoc.add_node(adoc)
+
+        bdoc = attrs_docs.TensorValueAttrs(
+            name="B",
+        )
+        gdoc.add_node(bdoc)
+
+        g = expression_graph.ExpressionGraph(gdoc)
+
+        eggs.assert_match(
+            g.list_nodes_of_type(expression_graph.NodeWrapper),
+            hamcrest.contains_inanyorder(
+                hamcrest.all_of(
+                    hamcrest.instance_of(expression_graph.NodeWrapper),
+                    hamcrest.has_property("attrs", adoc),
+                ),
+                hamcrest.all_of(
+                    hamcrest.instance_of(expression_graph.NodeWrapper),
+                    hamcrest.has_property("attrs", bdoc),
+                ),
+            ),
+        )
+
+        eggs.assert_match(
+            g.list_nodes_of_type(expression_graph.ExternalTensorValue),
+            hamcrest.contains_inanyorder(
+                hamcrest.all_of(
+                    hamcrest.instance_of(expression_graph.ExternalTensorValue),
+                    hamcrest.has_property("attrs", adoc),
+                ),
+            ),
+        )
+
+    def test_get_node(self) -> None:
+        gdoc = attrs_docs.OpGraphDoc()
+
+        adoc = attrs_docs.ExternalTensorValueAttrs(
+            name="A",
+            storage="pre:A",
+        )
+        gdoc.add_node(adoc)
+
+        bdoc = attrs_docs.TensorValueAttrs(
+            name="B",
+        )
+        gdoc.add_node(bdoc)
+
+        g = expression_graph.ExpressionGraph(gdoc)
+
+        # uuid lookup
+        eggs.assert_match(
+            g.get_node(adoc.node_id, expression_graph.NodeWrapper),
+            hamcrest.all_of(
+                hamcrest.instance_of(expression_graph.NodeWrapper),
+                hamcrest.has_property("attrs", adoc),
+            ),
+        )
+
+        # string lookup
+        eggs.assert_match(
+            g.get_node(str(adoc.node_id), expression_graph.NodeWrapper),
+            hamcrest.all_of(
+                hamcrest.instance_of(expression_graph.NodeWrapper),
+                hamcrest.has_property("attrs", adoc),
+            ),
+        )
+
+        eggs.assert_match(
+            g.get_node(adoc.node_id, expression_graph.ExternalTensorValue),
+            hamcrest.all_of(
+                hamcrest.instance_of(expression_graph.ExternalTensorValue),
+                hamcrest.has_property("attrs", adoc),
+            ),
+        )
+
+        eggs.assert_raises(
+            lambda: g.get_node(adoc.node_id, DisjointNodeWrapper),
+            ValueError,
+        )
+        eggs.assert_raises(
+            lambda: g.get_node(uuid.uuid4(), expression_graph.NodeWrapper),
+            KeyError,
+        )
