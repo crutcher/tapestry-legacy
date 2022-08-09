@@ -8,7 +8,7 @@ from marshmallow import fields
 from marshmallow_oneofschema import OneOfSchema
 
 from tapestry.serialization.json_serializable import JsonSerializable
-from tapestry.type_utils import _ensure_uuid
+from tapestry.type_utils import ensure_uuid
 
 
 @marshmallow_dataclass.dataclass
@@ -22,7 +22,7 @@ class NodeAttrsDoc(JsonSerializable):
         name: str,
         node_id: Optional[uuid.UUID] = None,
     ):
-        self.node_id = _ensure_uuid(node_id)
+        self.node_id = ensure_uuid(node_id)
         self.name = name
 
 

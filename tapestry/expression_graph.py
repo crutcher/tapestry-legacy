@@ -10,7 +10,7 @@ from tapestry.attrs_docs import (
     TensorSourceAttrs,
     TensorValueAttrs,
 )
-from tapestry.type_utils import UUIDConvertable, _coerce_uuid, _dict_to_parameter_str
+from tapestry.type_utils import UUIDConvertable, coerce_uuid, dict_to_parameter_str
 
 W = TypeVar("W", bound="NodeWrapper")
 
@@ -124,7 +124,7 @@ class NodeWrapper:
     def __repr__(self):
         return (
             f"{type(self).__name__}[{self.doc_type.__name__}]"
-            f"({_dict_to_parameter_str(asdict(self.attrs))})"
+            f"({dict_to_parameter_str(asdict(self.attrs))})"
         )
 
     def __str__(self):
@@ -228,7 +228,7 @@ class ExpressionGraph:
         :param wrapper_type: the wrapper type.
         :return: the wrapped node.
         """
-        node_id = _coerce_uuid(node_id)
+        node_id = coerce_uuid(node_id)
 
         if not issubclass(wrapper_type, NodeWrapper):
             raise AssertionError(
