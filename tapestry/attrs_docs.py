@@ -6,6 +6,7 @@ import marshmallow
 import marshmallow_dataclass
 from marshmallow import fields
 from marshmallow_oneofschema import OneOfSchema
+from overrides import overrides
 
 from tapestry.serialization.json_serializable import JsonDumpable, JsonLoadable
 from tapestry.type_utils import ensure_uuid
@@ -120,6 +121,7 @@ class OpGraphDoc(JsonDumpable):
 
         return G()
 
+    @overrides
     def get_dump_schema(self) -> marshmallow.Schema:
         return self.build_load_schema(
             {type(n) for n in self.nodes.values()},
@@ -136,4 +138,27 @@ class OpGraphDoc(JsonDumpable):
                 self.add_node(n)
 
     def add_node(self, node: NodeAttrsDoc) -> None:
+        """
+        Add a node to the document.
+
+        :param node: the node.
+        """
         self.nodes[node.node_id] = node
+
+    def assert_node_types(
+        self,
+        node_types: Iterable[Type[NodeAttrsDoc]],
+    ) -> None:
+        """
+        Assert that the OpGraphDoc contains only the listed types.
+
+        :param node_types: the node types.
+        :raises ValueError: if there are type violations.
+        """
+        node_types = set(node_types)
+        violations = {
+            type(node) for node in self.nodes.values() if type(node) not in node_types
+        }
+        if violations:
+            names = ", ".join(sorted(cls.__name__ for cls in violations))
+            raise ValueError(f"Illegal node types found: [{names}]")

@@ -2,6 +2,7 @@ import unittest
 import uuid
 
 import hamcrest
+from overrides import overrides
 
 from tapestry import attrs_docs, expression_graph
 from tapestry.testlib import eggs
@@ -23,8 +24,14 @@ class DisjointNodeWrapper(expression_graph.NodeWrapper):
 
 class CommonNodeWrapperTestBase(unittest.TestCase):
     WRAPPER_CLASS = expression_graph.NodeWrapper
+    """
+    Wrapper class being tested.
+    """
 
     def example_doc(self) -> attrs_docs.NodeAttrsDoc:
+        """
+        Subclasses can override.
+        """
         return attrs_docs.NodeAttrsDoc(name="foo")
 
     def test_common_construction(self) -> None:
@@ -129,6 +136,7 @@ class NodeWrapperTest(CommonNodeWrapperTestBase):
 class TensorSourceTest(CommonNodeWrapperTestBase):
     WRAPPER_CLASS = expression_graph.TensorSource
 
+    @overrides
     def example_doc(self) -> attrs_docs.NodeAttrsDoc:
         return attrs_docs.TensorSourceAttrs(
             name="foo",
@@ -138,6 +146,7 @@ class TensorSourceTest(CommonNodeWrapperTestBase):
 class TensorValueTest(CommonNodeWrapperTestBase):
     WRAPPER_CLASS = expression_graph.TensorValue
 
+    @overrides
     def example_doc(self) -> attrs_docs.NodeAttrsDoc:
         return attrs_docs.TensorValueAttrs(
             name="foo",
@@ -147,6 +156,7 @@ class TensorValueTest(CommonNodeWrapperTestBase):
 class ExternalTensorValueTest(CommonNodeWrapperTestBase):
     WRAPPER_CLASS = expression_graph.ExternalTensorValue
 
+    @overrides
     def example_doc(self) -> attrs_docs.NodeAttrsDoc:
         return attrs_docs.ExternalTensorValueAttrs(
             name="foo",

@@ -102,3 +102,33 @@ class OpGraphDocTest(unittest.TestCase):
             s.dump(s.load(s.dump(g))),
             expected_json,
         )
+
+    def test_assert_node_types(self) -> None:
+        g = attrs_docs.OpGraphDoc()
+        a = attrs_docs.ExternalTensorValueAttrs(
+            name="A",
+            storage="pre:A",
+        )
+        g.add_node(a)
+
+        b = attrs_docs.TensorValueAttrs(
+            name="B",
+        )
+        g.add_node(b)
+
+        g.assert_node_types(
+            [
+                attrs_docs.ExternalTensorValueAttrs,
+                attrs_docs.TensorValueAttrs,
+            ]
+        )
+
+        eggs.assert_raises(
+            lambda: g.assert_node_types(
+                [
+                    attrs_docs.TensorValueAttrs,
+                ],
+            ),
+            ValueError,
+            r"\[ExternalTensorValueAttrs\]",
+        )
