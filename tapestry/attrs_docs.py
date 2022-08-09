@@ -101,6 +101,8 @@ class GraphDoc(JsonDumpable):
 
         :param node: the node.
         """
+        if node.node_id in self.nodes:
+            raise ValueError(f"Node {node.node_id} already in graph.")
         self.nodes[node.node_id] = node
 
     def assert_node_types(

@@ -56,6 +56,11 @@ class OpGraphDocTest(unittest.TestCase):
             storage="pre:A",
         )
         g.add_node(a)
+        eggs.assert_raises(
+            lambda: g.add_node(a),
+            ValueError,
+            "already in graph",
+        )
 
         b = attrs_docs.TensorValueAttrs(
             node_id=uuid.uuid4(),
