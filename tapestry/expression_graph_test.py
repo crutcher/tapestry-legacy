@@ -6,11 +6,11 @@ import hamcrest
 from overrides import overrides
 
 from tapestry.expression_graph import (
-    EdgeAttrs,
+    EdgeAttributes,
     ExternalTensorValue,
     GraphDoc,
     GraphHandle,
-    NodeAttrs,
+    NodeAttributes,
     NodeHandle,
     TensorSource,
     TensorValue,
@@ -19,9 +19,9 @@ from tapestry.serialization import json_testlib
 from tapestry.testlib import eggs
 
 
-class DisjointAttrs(NodeAttrs):
+class DisjointAttributes(NodeAttributes):
     """
-    Test class which no other NodeAttrs is a subclass of.
+    Test class which no other NodeAttributes is a subclass of.
     """
 
 
@@ -30,7 +30,7 @@ class DisjointNodeHandle(NodeHandle):
     Test class which no other NodeHandle is a subclass of.
     """
 
-    attrs: DisjointAttrs
+    attrs: DisjointAttributes
 
 
 class CommonNodeWrapperTestBase(unittest.TestCase):
@@ -39,11 +39,11 @@ class CommonNodeWrapperTestBase(unittest.TestCase):
     Wrapper class being tested.
     """
 
-    def example_doc(self) -> NodeAttrs:
+    def example_doc(self) -> NodeAttributes:
         """
         Subclasses can override.
         """
-        return NodeAttrs(
+        return NodeAttributes(
             node_id=uuid.uuid4(),
             display_name="foo",
         )
@@ -83,10 +83,10 @@ class CommonNodeWrapperTestBase(unittest.TestCase):
             hamcrest.instance_of(self.HANDLE_CLASS),
         )
 
-        if attrs_class != NodeAttrs:
-            eggs.assert_false(node.wraps_doc_type(DisjointAttrs))
+        if attrs_class != NodeAttributes:
+            eggs.assert_false(node.wraps_doc_type(DisjointAttributes))
             eggs.assert_raises(
-                lambda: node.assert_wraps_doc_type(DisjointAttrs),
+                lambda: node.assert_wraps_doc_type(DisjointAttributes),
                 ValueError,
             )
 
@@ -104,11 +104,11 @@ class NodeWrapperTest(CommonNodeWrapperTestBase):
     def test_eq_hash(self) -> None:
         g = GraphHandle()
 
-        foo = NodeAttrs(
+        foo = NodeAttributes(
             node_id=uuid.uuid4(),
             display_name="foo",
         )
-        bar = NodeAttrs(
+        bar = NodeAttributes(
             node_id=uuid.uuid4(),
             display_name="bar",
         )
@@ -151,7 +151,7 @@ class TensorSourceTest(CommonNodeWrapperTestBase):
     HANDLE_CLASS = TensorSource.Handle
 
     @overrides
-    def example_doc(self) -> NodeAttrs:
+    def example_doc(self) -> NodeAttributes:
         return TensorSource(
             node_id=uuid.uuid4(),
             display_name="foo",
@@ -162,7 +162,7 @@ class TensorValueTest(CommonNodeWrapperTestBase):
     HANDLE_CLASS = TensorValue.Handle
 
     @overrides
-    def example_doc(self) -> NodeAttrs:
+    def example_doc(self) -> NodeAttributes:
         return TensorValue(
             node_id=uuid.uuid4(),
             display_name="foo",
@@ -173,7 +173,7 @@ class ExternalTensorValueTest(CommonNodeWrapperTestBase):
     HANDLE_CLASS = ExternalTensorValue.Handle
 
     @overrides
-    def example_doc(self) -> NodeAttrs:
+    def example_doc(self) -> NodeAttributes:
         return ExternalTensorValue(
             node_id=uuid.uuid4(),
             display_name="foo",
@@ -279,7 +279,7 @@ class ExpressionGraphTest(unittest.TestCase):
 
 
 class NodeAttrsDocTest(unittest.TestCase):
-    DOC_CLASS: Type[NodeAttrs] = NodeAttrs
+    DOC_CLASS: Type[NodeAttributes] = NodeAttributes
     """Overridable by subclasses."""
 
     def expected_json(self, node_id: uuid.UUID) -> Dict[str, Any]:
@@ -318,7 +318,7 @@ class ExternalTensorSourceAttrsTest(NodeAttrsDocTest):
         }
 
 
-class OpGraphDocTest(unittest.TestCase):
+class GraphDocTest(unittest.TestCase):
     def test_schema(self) -> None:
         g = GraphDoc()
         a = ExternalTensorValue(
@@ -339,7 +339,7 @@ class OpGraphDocTest(unittest.TestCase):
         )
         g.add_node(b)
 
-        edge_node = EdgeAttrs(
+        edge_node = EdgeAttributes(
             node_id=uuid.uuid4(),
             display_name="child",
             source_node_id=a.node_id,
@@ -349,7 +349,7 @@ class OpGraphDocTest(unittest.TestCase):
 
         s = GraphDoc.build_load_schema(
             [
-                EdgeAttrs,
+                EdgeAttributes,
                 TensorSource,
                 TensorValue,
                 ExternalTensorValue,
@@ -364,7 +364,7 @@ class OpGraphDocTest(unittest.TestCase):
                     "__edges__": [
                         {
                             **edge_node.dump_json_data(),
-                            "__type__": "EdgeAttrs",
+                            "__type__": "EdgeAttributes",
                         }
                     ],
                 },
@@ -424,13 +424,13 @@ class OpGraphDocTest(unittest.TestCase):
     def test_edges(self) -> None:
         g = GraphDoc()
 
-        foo_node = NodeAttrs(
+        foo_node = NodeAttributes(
             node_id=uuid.uuid4(),
             display_name="foo",
         )
         g.add_node(foo_node)
 
-        edge_node = EdgeAttrs(
+        edge_node = EdgeAttributes(
             node_id=uuid.uuid4(),
             display_name="bar",
             source_node_id=foo_node.node_id,
@@ -438,25 +438,25 @@ class OpGraphDocTest(unittest.TestCase):
         )
         g.add_node(edge_node)
 
-        illegal_source = EdgeAttrs(
+        illegal_source = EdgeAttributes(
             node_id=uuid.uuid4(),
             display_name="illegal",
             source_node_id=edge_node.node_id,
             target_node_id=foo_node.node_id,
         )
-        missing_source = EdgeAttrs(
+        missing_source = EdgeAttributes(
             node_id=uuid.uuid4(),
             display_name="illegal",
             source_node_id=uuid.uuid4(),
             target_node_id=foo_node.node_id,
         )
-        illegal_target = EdgeAttrs(
+        illegal_target = EdgeAttributes(
             node_id=uuid.uuid4(),
             display_name="illegal",
             source_node_id=foo_node.node_id,
             target_node_id=edge_node.node_id,
         )
-        missing_target = EdgeAttrs(
+        missing_target = EdgeAttributes(
             node_id=uuid.uuid4(),
             display_name="illegal",
             source_node_id=foo_node.node_id,

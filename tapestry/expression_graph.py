@@ -19,7 +19,7 @@ EDGES_FIELD = "__edges__"
 
 @marshmallow_dataclass.add_schema
 @dataclass(kw_only=True)
-class NodeAttrs(JsonLoadable):
+class NodeAttributes(JsonLoadable):
     node_id: uuid.UUID = field(default_factory=uuid.uuid4)
     """Unique in a document."""
 
@@ -29,7 +29,7 @@ class NodeAttrs(JsonLoadable):
 
 @marshmallow_dataclass.add_schema
 @dataclass(kw_only=True)
-class EdgeAttrs(NodeAttrs):
+class EdgeAttributes(NodeAttributes):
     source_node_id: uuid.UUID
     target_node_id: uuid.UUID
 
@@ -41,7 +41,7 @@ W = TypeVar("W", bound="NodeHandle")
 #  * TypeVar W
 class NodeHandle:
     """
-    Base class for node handles of NodeAttrs.
+    Base class for node handles of NodeAttributes.
 
     Provides reference to the containing `.graph`, and the embedded `.attrs`.
 
@@ -57,12 +57,12 @@ class NodeHandle:
     need to be a weakref.
     """
 
-    attrs: NodeAttrs
+    attrs: NodeAttributes
     """
-    The wrapped NodeAttrs.
+    The wrapped NodeAttributes.
     
     The type of this annotation is used to determine if a subclass is permitted
-    to wrap documents. Subclasses which wrap specialized NodeAttrs subclasses
+    to wrap documents. Subclasses which wrap specialized NodeAttributes subclasses
     should declare a more restrictive type for `.attrs`.
     
     This means that typed handles subclasses have typed attrs.
@@ -72,7 +72,7 @@ class NodeHandle:
         self,
         *,
         graph: "GraphHandle",
-        attrs: NodeAttrs,
+        attrs: NodeAttributes,
     ):
         self.graph = graph
 
@@ -91,15 +91,15 @@ class NodeHandle:
     @classmethod
     def wraps_doc_type(
         cls,
-        doc_type: Union[NodeAttrs, Type[NodeAttrs]],
+        doc_type: Union[NodeAttributes, Type[NodeAttributes]],
     ) -> bool:
         """
-        Will this NodeHandle subclass wrap the given NodeAttrs subclass?
+        Will this NodeHandle subclass wrap the given NodeAttributes subclass?
 
-        :param doc_type: the NodeAttrs type to test.
+        :param doc_type: the NodeAttributes type to test.
         :return: True if compatible.
         """
-        if isinstance(doc_type, NodeAttrs):
+        if isinstance(doc_type, NodeAttributes):
             doc_type = type(doc_type)
 
         attrs_type = typing.get_type_hints(cls)["attrs"]
@@ -109,21 +109,21 @@ class NodeHandle:
     @classmethod
     def assert_wraps_doc_type(
         cls,
-        doc_type: Union[NodeAttrs, Type[NodeAttrs]],
+        doc_type: Union[NodeAttributes, Type[NodeAttributes]],
     ) -> None:
         """
-        Assert that this NodeHandle subclass will wrap the given NodeAttrs subclass.
+        Assert that this NodeHandle subclass will wrap the given NodeAttributes subclass.
 
-        :param doc_type: the NodeAttrs type to test.
+        :param doc_type: the NodeAttributes type to test.
         :raises ValueError: on type incompatibility.
-        :raises AssertionError: if doc_type is not a NodeAttrs.
+        :raises AssertionError: if doc_type is not a NodeAttributes.
         """
-        if isinstance(doc_type, NodeAttrs):
+        if isinstance(doc_type, NodeAttributes):
             doc_type = type(doc_type)
 
-        if not issubclass(doc_type, NodeAttrs):
+        if not issubclass(doc_type, NodeAttributes):
             raise AssertionError(
-                f"{doc_type.__name__} is not a subclass of NodeAttrs",
+                f"{doc_type.__name__} is not a subclass of NodeAttributes",
             )
 
         if not cls.wraps_doc_type(doc_type):
@@ -137,7 +137,7 @@ class NodeHandle:
         return self.attrs.node_id
 
     @property
-    def doc_type(self) -> Type[NodeAttrs]:
+    def doc_type(self) -> Type[NodeAttributes]:
         """
         The type of the attrs.
         """
@@ -194,15 +194,15 @@ class NodeHandle:
 @dataclass
 class GraphDoc(JsonDumpable):
     """
-    Serializable NodeAttrs graph.
+    Serializable NodeAttributes graph.
     """
 
-    nodes: Dict[uuid.UUID, NodeAttrs]
+    nodes: Dict[uuid.UUID, NodeAttributes]
 
     @classmethod
     def build_load_schema(
         cls,
-        node_types: Iterable[Type[NodeAttrs]],
+        node_types: Iterable[Type[NodeAttributes]],
     ) -> marshmallow.Schema:
         """
         Builds a load schema for a collection of node types.
@@ -219,7 +219,7 @@ class GraphDoc(JsonDumpable):
             type_field = NODE_TYPE_FIELD
 
             type_schemas = {
-                cls.__name__: cast(Type[NodeAttrs], cls).get_load_schema()
+                cls.__name__: cast(Type[NodeAttributes], cls).get_load_schema()
                 for cls in node_types
             }
 
@@ -277,18 +277,18 @@ class GraphDoc(JsonDumpable):
     def __init__(
         self,
         *,
-        nodes: Optional[Dict[uuid.UUID, NodeAttrs]] = None,
+        nodes: Optional[Dict[uuid.UUID, NodeAttributes]] = None,
     ):
         self.nodes = {}
         if nodes is not None:
             for n in nodes.values():
                 self.add_node(n)
 
-    def add_node(self, node: NodeAttrs) -> None:
+    def add_node(self, node: NodeAttributes) -> None:
         """
         Add a node to the document.
 
-        EdgeAttrs nodes are validated that their `.source_node_id` and `.target_node_id`
+        EdgeAttributes nodes are validated that their `.source_node_id` and `.target_node_id`
         appear in the graph, and are not edges.
 
         :param node: the node.
@@ -296,7 +296,7 @@ class GraphDoc(JsonDumpable):
         if node.node_id in self.nodes:
             raise ValueError(f"Node {node.node_id} already in graph.")
 
-        if isinstance(node, EdgeAttrs):
+        if isinstance(node, EdgeAttributes):
             for port in ("source_node_id", "target_node_id"):
                 port_id = getattr(node, port)
                 if port_id not in self.nodes:
@@ -305,7 +305,7 @@ class GraphDoc(JsonDumpable):
                     )
 
                 port_node = self.nodes[port_id]
-                if isinstance(port_node, EdgeAttrs):
+                if isinstance(port_node, EdgeAttributes):
                     raise ValueError(
                         f"Edge {port}({port_id}) is an edge:\n\n{repr(node)}"
                         f"\n\n ==[{port}]==>\n\n{repr(port_node)}",
@@ -315,7 +315,7 @@ class GraphDoc(JsonDumpable):
 
     def assert_node_types(
         self,
-        node_types: Iterable[Type[NodeAttrs]],
+        node_types: Iterable[Type[NodeAttributes]],
     ) -> None:
         """
         Assert that the GraphDoc contains only the listed types.
@@ -375,7 +375,7 @@ class GraphHandle:
         handle_type: Type[W],
     ) -> W:
         """
-        Find a NodeAttrs by node_id, and wrap it in the given node type.
+        Find a NodeAttributes by node_id, and wrap it in the given node type.
 
         :param node_id: the node_id, may be str or UUID.
         :param handle_type: the wrapper type.
@@ -396,7 +396,7 @@ class GraphHandle:
 
 @marshmallow_dataclass.add_schema
 @dataclass(kw_only=True)
-class TensorSource(NodeAttrs):
+class TensorSource(NodeAttributes):
     class Handle(NodeHandle):
         attrs: "TensorSource"
 
