@@ -1,5 +1,3 @@
-import uuid
-
 from tapestry.expression_graph import EdgeAttrs, GraphDoc, NodeAttrs
 
 
@@ -7,14 +5,11 @@ def raw():
     g = GraphDoc()
 
     foo_node = NodeAttrs(
-        node_id=uuid.uuid4(),
         display_name="foo",
     )
     g.add_node(foo_node)
 
     edge_node = EdgeAttrs(
-        node_id=uuid.uuid4(),
-        display_name="bar",
         source_node_id=foo_node.node_id,
         target_node_id=foo_node.node_id,
     )
@@ -24,7 +19,6 @@ def raw():
 
     if False:
         bad_edge_node = EdgeAttrs(
-            node_id=uuid.uuid4(),
             display_name="bad",
             source_node_id=edge_node.node_id,
             target_node_id=foo_node.node_id,

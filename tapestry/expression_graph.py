@@ -1,7 +1,7 @@
 import copy
 import typing
 import uuid
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from typing import Dict, Iterable, List, Optional, Type, TypeVar, Union, cast
 
 import marshmallow
@@ -17,16 +17,18 @@ NODE_TYPE_FIELD = "__type__"
 EDGES_FIELD = "__edges__"
 
 
-@marshmallow_dataclass.dataclass
+@marshmallow_dataclass.add_schema
+@dataclass(kw_only=True)
 class NodeAttrs(JsonLoadable):
-    node_id: uuid.UUID
+    node_id: uuid.UUID = field(default_factory=uuid.uuid4)
     """Unique in a document."""
 
-    display_name: str
+    display_name: Optional[str] = None
     """May be repeated in a document."""
 
 
-@marshmallow_dataclass.dataclass
+@marshmallow_dataclass.add_schema
+@dataclass(kw_only=True)
 class EdgeAttrs(NodeAttrs):
     source_node_id: uuid.UUID
     target_node_id: uuid.UUID
@@ -392,19 +394,22 @@ class GraphHandle:
         )
 
 
-@marshmallow_dataclass.dataclass
+@marshmallow_dataclass.add_schema
+@dataclass(kw_only=True)
 class TensorSource(NodeAttrs):
     class Handle(NodeHandle):
         attrs: "TensorSource"
 
 
-@marshmallow_dataclass.dataclass
+@marshmallow_dataclass.add_schema
+@dataclass(kw_only=True)
 class TensorValue(TensorSource):
     class Handle(TensorSource.Handle):
         attrs: "TensorValue"
 
 
-@marshmallow_dataclass.dataclass
+@marshmallow_dataclass.add_schema
+@dataclass(kw_only=True)
 class ExternalTensorValue(TensorValue):
     class Handle(TensorValue.Handle):
         attrs: "ExternalTensorValue"
