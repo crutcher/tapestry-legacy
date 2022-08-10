@@ -1,6 +1,6 @@
 import uuid
 
-from tapestry.attrs_docs import EdgeAttrs, GraphDoc, NodeAttrs
+from tapestry.expression_graph import EdgeAttrs, GraphDoc, NodeAttrs
 
 
 def raw():

@@ -1,49 +1,60 @@
 import unittest
 import uuid
+from typing import Any, Dict, Type
 
 import hamcrest
 from overrides import overrides
 
-from tapestry import attrs_docs, expression_graph
+from tapestry.expression_graph import (
+    EdgeAttrs,
+    ExternalTensorValue,
+    GraphDoc,
+    GraphHandle,
+    NodeAttrs,
+    NodeHandle,
+    TensorSource,
+    TensorValue,
+)
+from tapestry.serialization import json_testlib
 from tapestry.testlib import eggs
 
 
-class DisjointAttrs(attrs_docs.NodeAttrs):
+class DisjointAttrs(NodeAttrs):
     """
     Test class which no other NodeAttrs is a subclass of.
     """
 
 
-class DisjointNodeWrapper(expression_graph.NodeWrapper):
+class DisjointNodeHandle(NodeHandle):
     """
-    Test class which no other NodeWrapper is a subclass of.
+    Test class which no other NodeHandle is a subclass of.
     """
 
     attrs: DisjointAttrs
 
 
 class CommonNodeWrapperTestBase(unittest.TestCase):
-    WRAPPER_CLASS = expression_graph.NodeWrapper
+    HANDLE_CLASS = NodeHandle
     """
     Wrapper class being tested.
     """
 
-    def example_doc(self) -> attrs_docs.NodeAttrs:
+    def example_doc(self) -> NodeAttrs:
         """
         Subclasses can override.
         """
-        return attrs_docs.NodeAttrs(
+        return NodeAttrs(
             node_id=uuid.uuid4(),
             display_name="foo",
         )
 
     def test_common_construction(self) -> None:
-        g = expression_graph.ExpressionGraph()
+        g = GraphHandle()
 
         attrs = self.example_doc()
         attrs_class = type(attrs)
 
-        node = self.WRAPPER_CLASS(
+        node = self.HANDLE_CLASS(
             graph=g,
             attrs=attrs,
         )
@@ -52,27 +63,27 @@ class CommonNodeWrapperTestBase(unittest.TestCase):
         node.assert_wraps_doc_type(attrs_class)
 
         eggs.assert_match(
-            node.try_as_type(expression_graph.NodeWrapper),
-            hamcrest.instance_of(expression_graph.NodeWrapper),
+            node.try_as_type(NodeHandle),
+            hamcrest.instance_of(NodeHandle),
         )
         eggs.assert_match(
-            node.force_as_type(expression_graph.NodeWrapper),
-            hamcrest.instance_of(expression_graph.NodeWrapper),
+            node.force_as_type(NodeHandle),
+            hamcrest.instance_of(NodeHandle),
         )
 
         eggs.assert_true(node.wraps_doc_type(attrs_class))
         node.assert_wraps_doc_type(attrs_class)
 
         eggs.assert_match(
-            node.try_as_type(self.WRAPPER_CLASS),
-            hamcrest.instance_of(self.WRAPPER_CLASS),
+            node.try_as_type(self.HANDLE_CLASS),
+            hamcrest.instance_of(self.HANDLE_CLASS),
         )
         eggs.assert_match(
-            node.force_as_type(self.WRAPPER_CLASS),
-            hamcrest.instance_of(self.WRAPPER_CLASS),
+            node.force_as_type(self.HANDLE_CLASS),
+            hamcrest.instance_of(self.HANDLE_CLASS),
         )
 
-        if attrs_class != attrs_docs.NodeAttrs:
+        if attrs_class != NodeAttrs:
             eggs.assert_false(node.wraps_doc_type(DisjointAttrs))
             eggs.assert_raises(
                 lambda: node.assert_wraps_doc_type(DisjointAttrs),
@@ -80,37 +91,37 @@ class CommonNodeWrapperTestBase(unittest.TestCase):
             )
 
         eggs.assert_match(
-            node.try_as_type(DisjointNodeWrapper),
+            node.try_as_type(DisjointNodeHandle),
             hamcrest.none(),
         )
         eggs.assert_raises(
-            lambda: node.force_as_type(DisjointNodeWrapper),
+            lambda: node.force_as_type(DisjointNodeHandle),
             ValueError,
         )
 
 
 class NodeWrapperTest(CommonNodeWrapperTestBase):
     def test_eq_hash(self) -> None:
-        g = expression_graph.ExpressionGraph()
+        g = GraphHandle()
 
-        foo = attrs_docs.NodeAttrs(
+        foo = NodeAttrs(
             node_id=uuid.uuid4(),
             display_name="foo",
         )
-        bar = attrs_docs.NodeAttrs(
+        bar = NodeAttrs(
             node_id=uuid.uuid4(),
             display_name="bar",
         )
 
-        foo_node_1 = expression_graph.NodeWrapper(
+        foo_node_1 = NodeHandle(
             graph=g,
             attrs=foo,
         )
-        foo_node_2 = expression_graph.NodeWrapper(
+        foo_node_2 = NodeHandle(
             graph=g,
             attrs=foo,
         )
-        bar_node = expression_graph.NodeWrapper(
+        bar_node = NodeHandle(
             graph=g,
             attrs=bar,
         )
@@ -137,131 +148,323 @@ class NodeWrapperTest(CommonNodeWrapperTestBase):
 
 
 class TensorSourceTest(CommonNodeWrapperTestBase):
-    WRAPPER_CLASS = expression_graph.TensorSource
+    HANDLE_CLASS = TensorSource.Handle
 
     @overrides
-    def example_doc(self) -> attrs_docs.NodeAttrs:
-        return attrs_docs.TensorSourceAttrs(
+    def example_doc(self) -> NodeAttrs:
+        return TensorSource(
             node_id=uuid.uuid4(),
             display_name="foo",
         )
 
 
 class TensorValueTest(CommonNodeWrapperTestBase):
-    WRAPPER_CLASS = expression_graph.TensorValue
+    HANDLE_CLASS = TensorValue.Handle
 
     @overrides
-    def example_doc(self) -> attrs_docs.NodeAttrs:
-        return attrs_docs.TensorValueAttrs(
+    def example_doc(self) -> NodeAttrs:
+        return TensorValue(
             node_id=uuid.uuid4(),
             display_name="foo",
         )
 
 
 class ExternalTensorValueTest(CommonNodeWrapperTestBase):
-    WRAPPER_CLASS = expression_graph.ExternalTensorValue
+    HANDLE_CLASS = ExternalTensorValue.Handle
 
     @overrides
-    def example_doc(self) -> attrs_docs.NodeAttrs:
-        return attrs_docs.ExternalTensorValueAttrs(
+    def example_doc(self) -> NodeAttrs:
+        return ExternalTensorValue(
             node_id=uuid.uuid4(),
             display_name="foo",
             storage="abc",
         )
 
 
-class ExpressionGraph(unittest.TestCase):
+class ExpressionGraphTest(unittest.TestCase):
     def test_list_nodes_of_type(self) -> None:
-        gdoc = attrs_docs.GraphDoc()
+        gdoc = GraphDoc()
 
-        adoc = attrs_docs.ExternalTensorValueAttrs(
+        adoc = ExternalTensorValue(
             node_id=uuid.uuid4(),
             display_name="A",
             storage="pre:A",
         )
         gdoc.add_node(adoc)
 
-        bdoc = attrs_docs.TensorValueAttrs(
+        bdoc = TensorValue(
             node_id=uuid.uuid4(),
             display_name="B",
         )
         gdoc.add_node(bdoc)
 
-        g = expression_graph.ExpressionGraph(gdoc)
+        g = GraphHandle(gdoc)
 
         eggs.assert_match(
-            g.list_nodes_of_type(expression_graph.NodeWrapper),
+            g.all_handles_of_type(NodeHandle),
             hamcrest.contains_inanyorder(
                 hamcrest.all_of(
-                    hamcrest.instance_of(expression_graph.NodeWrapper),
+                    hamcrest.instance_of(NodeHandle),
                     hamcrest.has_property("attrs", adoc),
                 ),
                 hamcrest.all_of(
-                    hamcrest.instance_of(expression_graph.NodeWrapper),
+                    hamcrest.instance_of(NodeHandle),
                     hamcrest.has_property("attrs", bdoc),
                 ),
             ),
         )
 
         eggs.assert_match(
-            g.list_nodes_of_type(expression_graph.ExternalTensorValue),
+            g.all_handles_of_type(ExternalTensorValue.Handle),
             hamcrest.contains_inanyorder(
                 hamcrest.all_of(
-                    hamcrest.instance_of(expression_graph.ExternalTensorValue),
+                    hamcrest.instance_of(ExternalTensorValue.Handle),
                     hamcrest.has_property("attrs", adoc),
                 ),
             ),
         )
 
     def test_get_node(self) -> None:
-        gdoc = attrs_docs.GraphDoc()
+        gdoc = GraphDoc()
 
-        adoc = attrs_docs.ExternalTensorValueAttrs(
+        adoc = ExternalTensorValue(
             node_id=uuid.uuid4(),
             display_name="A",
             storage="pre:A",
         )
         gdoc.add_node(adoc)
 
-        bdoc = attrs_docs.TensorValueAttrs(
+        bdoc = TensorValue(
             node_id=uuid.uuid4(),
             display_name="B",
         )
         gdoc.add_node(bdoc)
 
-        g = expression_graph.ExpressionGraph(gdoc)
+        g = GraphHandle(gdoc)
 
         # uuid lookup
         eggs.assert_match(
-            g.get_node(adoc.node_id, expression_graph.NodeWrapper),
+            g.get_node(adoc.node_id, NodeHandle),
             hamcrest.all_of(
-                hamcrest.instance_of(expression_graph.NodeWrapper),
+                hamcrest.instance_of(NodeHandle),
                 hamcrest.has_property("attrs", adoc),
             ),
         )
 
         # string lookup
         eggs.assert_match(
-            g.get_node(str(adoc.node_id), expression_graph.NodeWrapper),
+            g.get_node(str(adoc.node_id), NodeHandle),
             hamcrest.all_of(
-                hamcrest.instance_of(expression_graph.NodeWrapper),
+                hamcrest.instance_of(NodeHandle),
                 hamcrest.has_property("attrs", adoc),
             ),
         )
 
         eggs.assert_match(
-            g.get_node(adoc.node_id, expression_graph.ExternalTensorValue),
+            g.get_node(adoc.node_id, ExternalTensorValue.Handle),
             hamcrest.all_of(
-                hamcrest.instance_of(expression_graph.ExternalTensorValue),
+                hamcrest.instance_of(ExternalTensorValue.Handle),
                 hamcrest.has_property("attrs", adoc),
             ),
         )
 
         eggs.assert_raises(
-            lambda: g.get_node(adoc.node_id, DisjointNodeWrapper),
+            lambda: g.get_node(adoc.node_id, DisjointNodeHandle),
             ValueError,
         )
         eggs.assert_raises(
-            lambda: g.get_node(uuid.uuid4(), expression_graph.NodeWrapper),
+            lambda: g.get_node(uuid.uuid4(), NodeHandle),
             KeyError,
         )
+
+
+class NodeAttrsDocTest(unittest.TestCase):
+    DOC_CLASS: Type[NodeAttrs] = NodeAttrs
+    """Overridable by subclasses."""
+
+    def expected_json(self, node_id: uuid.UUID) -> Dict[str, Any]:
+        return {
+            "node_id": str(node_id),
+            "display_name": "foo",
+        }
+
+    def test_lifecycle(self) -> None:
+        node_id = uuid.uuid4()
+        json = self.expected_json(node_id)
+        node = self.DOC_CLASS.load_json_data(json)
+
+        json_testlib.assert_json_serializable_roundtrip(
+            node,
+            json,
+        )
+
+
+class TensorSourceAttrsTest(NodeAttrsDocTest):
+    DOC_CLASS = TensorSource
+
+
+class TensorValueAttrsTest(NodeAttrsDocTest):
+    DOC_CLASS = TensorValue
+
+
+class ExternalTensorSourceAttrsTest(NodeAttrsDocTest):
+    DOC_CLASS = ExternalTensorValue
+
+    def expected_json(self, node_id: uuid.UUID) -> Dict[str, Any]:
+        return {
+            "node_id": str(node_id),
+            "display_name": "foo",
+            "storage": "abc",
+        }
+
+
+class OpGraphDocTest(unittest.TestCase):
+    def test_schema(self) -> None:
+        g = GraphDoc()
+        a = ExternalTensorValue(
+            node_id=uuid.uuid4(),
+            display_name="A",
+            storage="pre:A",
+        )
+        g.add_node(a)
+        eggs.assert_raises(
+            lambda: g.add_node(a),
+            ValueError,
+            "already in graph",
+        )
+
+        b = TensorValue(
+            node_id=uuid.uuid4(),
+            display_name="B",
+        )
+        g.add_node(b)
+
+        edge_node = EdgeAttrs(
+            node_id=uuid.uuid4(),
+            display_name="child",
+            source_node_id=a.node_id,
+            target_node_id=b.node_id,
+        )
+        g.add_node(edge_node)
+
+        s = GraphDoc.build_load_schema(
+            [
+                EdgeAttrs,
+                TensorSource,
+                TensorValue,
+                ExternalTensorValue,
+            ]
+        )
+
+        expected_json = {
+            "nodes": {
+                str(a.node_id): {
+                    "__type__": "ExternalTensorValue",
+                    **a.dump_json_data(),
+                    "__edges__": [
+                        {
+                            **edge_node.dump_json_data(),
+                            "__type__": "EdgeAttrs",
+                        }
+                    ],
+                },
+                str(b.node_id): {
+                    "__type__": "TensorValue",
+                    **b.dump_json_data(),
+                },
+            },
+        }
+
+        eggs.assert_match(
+            s.dump(g),
+            expected_json,
+        )
+        eggs.assert_match(
+            g.dump_json_data(),
+            expected_json,
+        )
+
+        eggs.assert_match(
+            s.dump(s.load(s.dump(g))),
+            expected_json,
+        )
+
+    def test_assert_node_types(self) -> None:
+        g = GraphDoc()
+        a = ExternalTensorValue(
+            node_id=uuid.uuid4(),
+            display_name="A",
+            storage="pre:A",
+        )
+        g.add_node(a)
+
+        b = TensorValue(
+            node_id=uuid.uuid4(),
+            display_name="B",
+        )
+        g.add_node(b)
+
+        g.assert_node_types(
+            [
+                ExternalTensorValue,
+                TensorValue,
+            ]
+        )
+
+        eggs.assert_raises(
+            lambda: g.assert_node_types(
+                [
+                    TensorValue,
+                ],
+            ),
+            ValueError,
+            r"\[ExternalTensorValue\]",
+        )
+
+    def test_edges(self) -> None:
+        g = GraphDoc()
+
+        foo_node = NodeAttrs(
+            node_id=uuid.uuid4(),
+            display_name="foo",
+        )
+        g.add_node(foo_node)
+
+        edge_node = EdgeAttrs(
+            node_id=uuid.uuid4(),
+            display_name="bar",
+            source_node_id=foo_node.node_id,
+            target_node_id=foo_node.node_id,
+        )
+        g.add_node(edge_node)
+
+        illegal_source = EdgeAttrs(
+            node_id=uuid.uuid4(),
+            display_name="illegal",
+            source_node_id=edge_node.node_id,
+            target_node_id=foo_node.node_id,
+        )
+        missing_source = EdgeAttrs(
+            node_id=uuid.uuid4(),
+            display_name="illegal",
+            source_node_id=uuid.uuid4(),
+            target_node_id=foo_node.node_id,
+        )
+        illegal_target = EdgeAttrs(
+            node_id=uuid.uuid4(),
+            display_name="illegal",
+            source_node_id=foo_node.node_id,
+            target_node_id=edge_node.node_id,
+        )
+        missing_target = EdgeAttrs(
+            node_id=uuid.uuid4(),
+            display_name="illegal",
+            source_node_id=foo_node.node_id,
+            target_node_id=uuid.uuid4(),
+        )
+
+        for bad in (illegal_source, missing_source, illegal_target, missing_target):
+            eggs.assert_raises(
+                lambda: g.add_node(bad),
+                ValueError,
+            )
