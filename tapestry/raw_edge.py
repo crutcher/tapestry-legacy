@@ -1,41 +1,45 @@
-from tapestry.attrs_docs import ExternalTensorValueAttrs, GraphDoc, TensorValueAttrs
-from tapestry.expression_graph import (
-    ExpressionGraph,
-    ExternalTensorValue,
-    NodeWrapper,
-    TensorSource,
-)
+import uuid
+
+from tapestry.attrs_docs import EdgeAttrs, GraphDoc, NodeAttrs
 
 
 def raw():
-    gdoc = GraphDoc()
+    g = GraphDoc()
 
-    adoc = ExternalTensorValueAttrs(
-        display_name="A",
-        storage="pre:A",
+    foo_node = NodeAttrs(
+        node_id=uuid.uuid4(),
+        display_name="foo",
     )
-    gdoc.add_node(adoc)
+    g.add_node(foo_node)
 
-    bdoc = TensorValueAttrs(
-        display_name="B",
+    edge_node = EdgeAttrs(
+        node_id=uuid.uuid4(),
+        display_name="bar",
+        source_node_id=foo_node.node_id,
+        target_node_id=foo_node.node_id,
     )
-    gdoc.add_node(bdoc)
+    g.add_node(edge_node)
 
-    print(gdoc.pretty())
+    print(g.pretty())
 
-    g = ExpressionGraph(gdoc)
-    print(g.list_nodes_of_type(ExternalTensorValue))
+    if False:
+        bad_edge_node = EdgeAttrs(
+            node_id=uuid.uuid4(),
+            display_name="bad",
+            source_node_id=edge_node.node_id,
+            target_node_id=foo_node.node_id,
+        )
+        g.add_node(bad_edge_node)
 
-    print(g.get_node(bdoc.node_id, TensorSource))
+    s = GraphDoc.build_load_schema(
+        [
+            NodeAttrs,
+            EdgeAttrs,
+        ]
+    )
 
-    x = g.get_node(bdoc.node_id, TensorSource)
-    if y := x.try_as_type(NodeWrapper):
-        print("expected", y)
-    if y := x.try_as_type(ExternalTensorValue):
-        print("not expected", y)
-
-    z = g.get_node(adoc.node_id, ExternalTensorValue)
-    print(z.attrs.storage)
+    g2 = s.load(g.dump_json_data())
+    print(g2.pretty())
 
 
 if __name__ == "__main__":

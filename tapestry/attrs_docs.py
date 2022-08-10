@@ -1,3 +1,4 @@
+import copy
 import uuid
 from dataclasses import dataclass
 from typing import Dict, Iterable, Optional, Type, cast
@@ -10,9 +11,12 @@ from overrides import overrides
 
 from tapestry.serialization.json_serializable import JsonDumpable, JsonLoadable
 
+NODE_TYPE_FIELD = "__type__"
+EDGES_FIELD = "__edges__"
+
 
 @marshmallow_dataclass.dataclass
-class NodeAttrsDoc(JsonLoadable):
+class NodeAttrs(JsonLoadable):
     node_id: uuid.UUID
     """Unique in a document."""
 
@@ -21,7 +25,13 @@ class NodeAttrsDoc(JsonLoadable):
 
 
 @marshmallow_dataclass.dataclass
-class TensorSourceAttrs(NodeAttrsDoc):
+class EdgeAttrs(NodeAttrs):
+    source_node_id: uuid.UUID
+    target_node_id: uuid.UUID
+
+
+@marshmallow_dataclass.dataclass
+class TensorSourceAttrs(NodeAttrs):
     pass
 
 
@@ -38,15 +48,15 @@ class ExternalTensorValueAttrs(TensorValueAttrs):
 @dataclass
 class GraphDoc(JsonDumpable):
     """
-    Serializable NodeAttrsDoc graph.
+    Serializable NodeAttrs graph.
     """
 
-    nodes: Dict[uuid.UUID, NodeAttrsDoc]
+    nodes: Dict[uuid.UUID, NodeAttrs]
 
     @classmethod
     def build_load_schema(
         cls,
-        node_types: Iterable[Type[NodeAttrsDoc]],
+        node_types: Iterable[Type[NodeAttrs]],
     ) -> marshmallow.Schema:
         """
         Builds a load schema for a collection of node types.
@@ -60,10 +70,10 @@ class GraphDoc(JsonDumpable):
             Polymorphic type-dispatch wrapper for NodeAttrDoc subclasses.
             """
 
-            type_field = "__type__"
+            type_field = NODE_TYPE_FIELD
 
             type_schemas = {
-                cls.__name__: cast(Type[NodeAttrsDoc], cls).get_load_schema()
+                cls.__name__: cast(Type[NodeAttrs], cls).get_load_schema()
                 for cls in node_types
             }
 
@@ -72,6 +82,39 @@ class GraphDoc(JsonDumpable):
                 fields.UUID,
                 fields.Nested(N),
             )
+
+            @marshmallow.post_dump
+            def post_dump(self, data, **kwargs):
+                nodes = data["nodes"]
+                edges = [node for node in nodes.values() if "source_node_id" in node]
+                for edge in edges:
+                    del nodes[edge["node_id"]]
+
+                    source_node = nodes[edge["source_node_id"]]
+
+                    if EDGES_FIELD not in source_node:
+                        source_node[EDGES_FIELD] = []
+
+                    source_node[EDGES_FIELD].append(edge)
+
+                return data
+
+            @marshmallow.pre_load
+            def pre_load(self, data, **kwargs):
+                # don't mess with whatever the input source was.
+                data = copy.deepcopy(data)
+
+                nodes = data["nodes"]
+                edges = []
+                for node in nodes.values():
+                    if EDGES_FIELD in node:
+                        edges.extend(node[EDGES_FIELD])
+                        del node[EDGES_FIELD]
+
+                for edge in edges:
+                    nodes[edge["node_id"]] = edge
+
+                return data
 
             @marshmallow.post_load
             def post_load(self, data, **kwargs):
@@ -88,26 +131,45 @@ class GraphDoc(JsonDumpable):
     def __init__(
         self,
         *,
-        nodes: Optional[Dict[uuid.UUID, NodeAttrsDoc]] = None,
+        nodes: Optional[Dict[uuid.UUID, NodeAttrs]] = None,
     ):
         self.nodes = {}
         if nodes is not None:
             for n in nodes.values():
                 self.add_node(n)
 
-    def add_node(self, node: NodeAttrsDoc) -> None:
+    def add_node(self, node: NodeAttrs) -> None:
         """
         Add a node to the document.
+
+        EdgeAttrs nodes are validated that their `.source_node_id` and `.target_node_id`
+        appear in the graph, and are not edges.
 
         :param node: the node.
         """
         if node.node_id in self.nodes:
             raise ValueError(f"Node {node.node_id} already in graph.")
+
+        if isinstance(node, EdgeAttrs):
+            for port in ("source_node_id", "target_node_id"):
+                port_id = getattr(node, port)
+                if port_id not in self.nodes:
+                    raise ValueError(
+                        f"Edge {port}({port_id}) not in graph:\n\n{repr(node)}",
+                    )
+
+                port_node = self.nodes[port_id]
+                if isinstance(port_node, EdgeAttrs):
+                    raise ValueError(
+                        f"Edge {port}({port_id}) is an edge:\n\n{repr(node)}"
+                        f"\n\n ==[{port}]==>\n\n{repr(port_node)}",
+                    )
+
         self.nodes[node.node_id] = node
 
     def assert_node_types(
         self,
-        node_types: Iterable[Type[NodeAttrsDoc]],
+        node_types: Iterable[Type[NodeAttrs]],
     ) -> None:
         """
         Assert that the GraphDoc contains only the listed types.

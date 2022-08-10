@@ -9,8 +9,12 @@ class JsonDumpable:
     """
     Base class for marshmallow dumpable dataclasses.
     """
+
     class Meta:
+        # marshmallow_dataclasses control class.
+
         ordered = True
+        # order the fields by declaration order.
 
     def get_dump_schema(self) -> marshmallow.Schema:
         raise NotImplementedError("Subclass Implements")
@@ -36,6 +40,7 @@ class JsonLoadable(JsonDumpable):
     """
     Base class for marshmallow loadable dataclasses.
     """
+
     Schema: ClassVar[Type[marshmallow.Schema]] = marshmallow.Schema
 
     @classmethod

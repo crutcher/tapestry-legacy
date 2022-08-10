@@ -8,7 +8,7 @@ from tapestry.testlib import eggs
 
 
 class NodeAttrsDocTest(unittest.TestCase):
-    DOC_CLASS: Type[attrs_docs.NodeAttrsDoc] = attrs_docs.NodeAttrsDoc
+    DOC_CLASS: Type[attrs_docs.NodeAttrs] = attrs_docs.NodeAttrs
     """Overridable by subclasses."""
 
     def expected_json(self, node_id: uuid.UUID) -> Dict[str, Any]:
@@ -68,8 +68,17 @@ class OpGraphDocTest(unittest.TestCase):
         )
         g.add_node(b)
 
+        edge_node = attrs_docs.EdgeAttrs(
+            node_id=uuid.uuid4(),
+            display_name="child",
+            source_node_id=a.node_id,
+            target_node_id=b.node_id,
+        )
+        g.add_node(edge_node)
+
         s = attrs_docs.GraphDoc.build_load_schema(
             [
+                attrs_docs.EdgeAttrs,
                 attrs_docs.TensorSourceAttrs,
                 attrs_docs.TensorValueAttrs,
                 attrs_docs.ExternalTensorValueAttrs,
@@ -81,6 +90,12 @@ class OpGraphDocTest(unittest.TestCase):
                 str(a.node_id): {
                     "__type__": "ExternalTensorValueAttrs",
                     **a.dump_json_data(),
+                    "__edges__": [
+                        {
+                            **edge_node.dump_json_data(),
+                            "__type__": "EdgeAttrs",
+                        }
+                    ],
                 },
                 str(b.node_id): {
                     "__type__": "TensorValueAttrs",
@@ -134,3 +149,51 @@ class OpGraphDocTest(unittest.TestCase):
             ValueError,
             r"\[ExternalTensorValueAttrs\]",
         )
+
+    def test_edges(self) -> None:
+        g = attrs_docs.GraphDoc()
+
+        foo_node = attrs_docs.NodeAttrs(
+            node_id=uuid.uuid4(),
+            display_name="foo",
+        )
+        g.add_node(foo_node)
+
+        edge_node = attrs_docs.EdgeAttrs(
+            node_id=uuid.uuid4(),
+            display_name="bar",
+            source_node_id=foo_node.node_id,
+            target_node_id=foo_node.node_id,
+        )
+        g.add_node(edge_node)
+
+        illegal_source = attrs_docs.EdgeAttrs(
+            node_id=uuid.uuid4(),
+            display_name="illegal",
+            source_node_id=edge_node.node_id,
+            target_node_id=foo_node.node_id,
+        )
+        missing_source = attrs_docs.EdgeAttrs(
+            node_id=uuid.uuid4(),
+            display_name="illegal",
+            source_node_id=uuid.uuid4(),
+            target_node_id=foo_node.node_id,
+        )
+        illegal_target = attrs_docs.EdgeAttrs(
+            node_id=uuid.uuid4(),
+            display_name="illegal",
+            source_node_id=foo_node.node_id,
+            target_node_id=edge_node.node_id,
+        )
+        missing_target = attrs_docs.EdgeAttrs(
+            node_id=uuid.uuid4(),
+            display_name="illegal",
+            source_node_id=foo_node.node_id,
+            target_node_id=uuid.uuid4(),
+        )
+
+        for bad in (illegal_source, missing_source, illegal_target, missing_target):
+            eggs.assert_raises(
+                lambda: g.add_node(bad),
+                ValueError,
+            )

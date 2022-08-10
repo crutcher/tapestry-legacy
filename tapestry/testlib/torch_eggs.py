@@ -144,7 +144,7 @@ def assert_tensor_structure(
     expected: TensorConvertable,
 ) -> None:
     """
-    Assert that the `actual` matches the structure (not data) of the `expected`.
+    Assert that the `actual` matches the structure (not tensor) of the `expected`.
 
     :param actual: a tensor.
     :param expected: an expected structure.
@@ -157,7 +157,7 @@ def assert_tensor_structure(
 
 class TensorMatcher(TensorStructureMatcher):
     """
-    PyHamcrest matcher for comparing the structure and data a tensor to an exemplar.
+    PyHamcrest matcher for comparing the structure and tensor a tensor to an exemplar.
 
     Matches:
       - device

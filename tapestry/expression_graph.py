@@ -6,7 +6,7 @@ from typing import List, Optional, Type, TypeVar, Union
 from tapestry.attrs_docs import (
     ExternalTensorValueAttrs,
     GraphDoc,
-    NodeAttrsDoc,
+    NodeAttrs,
     TensorSourceAttrs,
     TensorValueAttrs,
 )
@@ -19,7 +19,7 @@ W = TypeVar("W", bound="NodeWrapper")
 #  * TypeVar W
 class NodeWrapper:
     """
-    Base class for node wrappers of NodeAttrsDoc.
+    Base class for node wrappers of NodeAttrs.
 
     Provides reference to the containing `.graph`, and the embedded `.attrs`.
 
@@ -35,12 +35,12 @@ class NodeWrapper:
     need to be a weakref.
     """
 
-    attrs: NodeAttrsDoc
+    attrs: NodeAttrs
     """
-    The wrapped NodeAttrsDoc.
+    The wrapped NodeAttrs.
     
     The type of this annotation is used to determine if a subclass is permitted
-    to wrap documents. Subclasses which wrap specialized NodeAttrsDoc subclasses
+    to wrap documents. Subclasses which wrap specialized NodeAttrs subclasses
     should declare a more restrictive type for `.attrs`.
     
     This means that typed wrapper subclasses have typed attrs.
@@ -50,7 +50,7 @@ class NodeWrapper:
         self,
         *,
         graph: "ExpressionGraph",
-        attrs: NodeAttrsDoc,
+        attrs: NodeAttrs,
     ):
         self.graph = graph
 
@@ -69,15 +69,15 @@ class NodeWrapper:
     @classmethod
     def wraps_doc_type(
         cls,
-        doc_type: Union[NodeAttrsDoc, Type[NodeAttrsDoc]],
+        doc_type: Union[NodeAttrs, Type[NodeAttrs]],
     ) -> bool:
         """
-        Will this NodeWrapper subclass wrap the given NodeAttrsDoc subclass?
+        Will this NodeWrapper subclass wrap the given NodeAttrs subclass?
 
-        :param doc_type: the NodeAttrsDoc type to test.
+        :param doc_type: the NodeAttrs type to test.
         :return: True if compatible.
         """
-        if isinstance(doc_type, NodeAttrsDoc):
+        if isinstance(doc_type, NodeAttrs):
             doc_type = type(doc_type)
 
         attrs_type = typing.get_type_hints(cls)["attrs"]
@@ -87,21 +87,21 @@ class NodeWrapper:
     @classmethod
     def assert_wraps_doc_type(
         cls,
-        doc_type: Union[NodeAttrsDoc, Type[NodeAttrsDoc]],
+        doc_type: Union[NodeAttrs, Type[NodeAttrs]],
     ) -> None:
         """
-        Assert that this NodeWrapper subclass will wrap the given NodeAttrsDoc subclass.
+        Assert that this NodeWrapper subclass will wrap the given NodeAttrs subclass.
 
-        :param doc_type: the NodeAttrsDoc type to test.
+        :param doc_type: the NodeAttrs type to test.
         :raises ValueError: on type incompatibility.
-        :raises AssertionError: if doc_type is not a NodeAttrsDoc.
+        :raises AssertionError: if doc_type is not a NodeAttrs.
         """
-        if isinstance(doc_type, NodeAttrsDoc):
+        if isinstance(doc_type, NodeAttrs):
             doc_type = type(doc_type)
 
-        if not issubclass(doc_type, NodeAttrsDoc):
+        if not issubclass(doc_type, NodeAttrs):
             raise AssertionError(
-                f"{doc_type.__name__} is not a subclass of NodeAttrsDoc",
+                f"{doc_type.__name__} is not a subclass of NodeAttrs",
             )
 
         if not cls.wraps_doc_type(doc_type):
@@ -115,7 +115,7 @@ class NodeWrapper:
         return self.attrs.node_id
 
     @property
-    def doc_type(self) -> Type[NodeAttrsDoc]:
+    def doc_type(self) -> Type[NodeAttrs]:
         """
         The type of the attrs.
         """
@@ -222,7 +222,7 @@ class ExpressionGraph:
         wrapper_type: Type[W],
     ) -> W:
         """
-        Find a NodeAttrsDoc by node_id, and wrap it in the given node type.
+        Find a NodeAttrs by node_id, and wrap it in the given node type.
 
         :param node_id: the node_id, may be str or UUID.
         :param wrapper_type: the wrapper type.

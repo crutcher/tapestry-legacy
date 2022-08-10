@@ -6,10 +6,10 @@ from tapestry.testlib import eggs
 
 def assert_json_serializable_roundtrip(actual, json_data) -> None:
     """
-    Assert that a JsonLoadable class roundtrips to target json data.
+    Assert that a JsonLoadable class roundtrips to target json tensor.
 
     :param actual: the object.
-    :param json_data: the expected json data.
+    :param json_data: the expected json tensor.
     """
     eggs.assert_match(
         actual,

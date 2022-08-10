@@ -7,7 +7,7 @@ from marshmallow_dataclass import dataclass
 from tapestry.serialization.json_serializable import JsonLoadable
 from tapestry.serialization.json_testlib import assert_json_serializable_roundtrip
 from tapestry.testlib import eggs, np_eggs
-from tapestry.zspace import ZAffineMap, ZArray, ZRange, ZRangeMap
+from tapestry.zspace import ZArray, ZRange, ZRangeMap, ZTransform
 
 
 def _assert_hash_eq(a, b):
@@ -170,7 +170,7 @@ class ZRangeTest(unittest.TestCase):
 class ZAffineMapTest(unittest.TestCase):
     def test_construction(self):
         eggs.assert_match(
-            ZAffineMap(
+            ZTransform(
                 projection=[[2, 0], [0, 1]],
                 offset=[-5, 3],
             ),
@@ -181,7 +181,7 @@ class ZAffineMapTest(unittest.TestCase):
         )
 
         eggs.assert_raises(
-            lambda: ZAffineMap(
+            lambda: ZTransform(
                 projection=[[2, 0], [0, 1]],
                 offset=[-5, 3, 7],
             ),
@@ -190,7 +190,7 @@ class ZAffineMapTest(unittest.TestCase):
         )
 
         eggs.assert_raises(
-            lambda: ZAffineMap(
+            lambda: ZTransform(
                 projection=3,
                 offset=[-5, 3],
             ),
@@ -199,7 +199,7 @@ class ZAffineMapTest(unittest.TestCase):
         )
 
         eggs.assert_raises(
-            lambda: ZAffineMap(
+            lambda: ZTransform(
                 projection=[[2, 0], [0, 1]],
                 offset=3,
             ),
@@ -209,7 +209,7 @@ class ZAffineMapTest(unittest.TestCase):
 
     def test_json(self):
         assert_json_serializable_roundtrip(
-            ZAffineMap(
+            ZTransform(
                 projection=[[2, 0], [0, 1]],
                 offset=[-5, 3],
             ),
@@ -222,17 +222,17 @@ class ZAffineMapTest(unittest.TestCase):
 
         # verify that hash and eq work for all embedded properties.
         _assert_hash_eq(
-            ZAffineMap(projection=projection, offset=offset),
-            ZAffineMap(projection=projection + 1, offset=offset),
+            ZTransform(projection=projection, offset=offset),
+            ZTransform(projection=projection + 1, offset=offset),
         )
         _assert_hash_eq(
-            ZAffineMap(projection=projection, offset=offset),
-            ZAffineMap(projection=projection, offset=offset + 1),
+            ZTransform(projection=projection, offset=offset),
+            ZTransform(projection=projection, offset=offset + 1),
         )
 
     def test_props(self):
         eggs.assert_match(
-            ZAffineMap(
+            ZTransform(
                 projection=[[2, 0, 1], [0, 1, 1]],
                 offset=[-5, 3, 0],
             ),
@@ -245,7 +245,7 @@ class ZAffineMapTest(unittest.TestCase):
 
     def test_constant(self):
         eggs.assert_match(
-            ZAffineMap(
+            ZTransform(
                 projection=[[0, 0], [0, 0]],
                 offset=[-5, 0],
             ),
@@ -256,7 +256,7 @@ class ZAffineMapTest(unittest.TestCase):
 
     def test_marginal_strides(self):
         eggs.assert_match(
-            ZAffineMap(
+            ZTransform(
                 projection=[[2, 0, 1], [0, 1, 1]],
                 offset=[-5, 3, 1],
             ).marginal_strides(),
@@ -273,14 +273,14 @@ class ZRangeMapTest(unittest.TestCase):
     def test_construction(self):
         eggs.assert_match(
             ZRangeMap(
-                zaffine_map=ZAffineMap(
+                transform=ZTransform(
                     projection=[[2, 0], [0, 1]],
                     offset=[-5, 3],
                 ),
                 shape=[2, 2],
             ),
             hamcrest.has_properties(
-                zaffine_map=ZAffineMap(
+                transform=ZTransform(
                     projection=[[2, 0], [0, 1]],
                     offset=[-5, 3],
                 ),
@@ -290,7 +290,7 @@ class ZRangeMapTest(unittest.TestCase):
 
         eggs.assert_raises(
             lambda: ZRangeMap(
-                zaffine_map=ZAffineMap(
+                transform=ZTransform(
                     projection=[[2, 0], [0, 1]],
                     offset=[-5, 3],
                 ),
@@ -303,14 +303,14 @@ class ZRangeMapTest(unittest.TestCase):
     def test_json(self):
         assert_json_serializable_roundtrip(
             ZRangeMap(
-                zaffine_map=ZAffineMap(
+                transform=ZTransform(
                     projection=[[2, 0], [0, 1]],
                     offset=[-5, 3],
                 ),
                 shape=[2, 2],
             ),
             {
-                "zaffine_map": {"projection": [[2, 0], [0, 1]], "offset": [-5, 3]},
+                "transform": {"projection": [[2, 0], [0, 1]], "offset": [-5, 3]},
                 "shape": [2, 2],
             },
         )
@@ -318,7 +318,7 @@ class ZRangeMapTest(unittest.TestCase):
     def test_props(self):
         eggs.assert_match(
             ZRangeMap(
-                zaffine_map=ZAffineMap(
+                transform=ZTransform(
                     projection=[[2, 0, 1], [0, 1, 1]],
                     offset=[-5, 3, 0],
                 ),
@@ -339,14 +339,14 @@ class ZRangeMapTest(unittest.TestCase):
         # verify that hash and eq work for all embedded properties.
         _assert_hash_eq(
             ZRangeMap(
-                zaffine_map=ZAffineMap(
+                transform=ZTransform(
                     projection=projection,
                     offset=offset,
                 ),
                 shape=shape,
             ),
             ZRangeMap(
-                zaffine_map=ZAffineMap(
+                transform=ZTransform(
                     projection=projection + 1,
                     offset=offset,
                 ),
@@ -355,14 +355,14 @@ class ZRangeMapTest(unittest.TestCase):
         )
         _assert_hash_eq(
             ZRangeMap(
-                zaffine_map=ZAffineMap(
+                transform=ZTransform(
                     projection=projection,
                     offset=offset,
                 ),
                 shape=shape,
             ),
             ZRangeMap(
-                zaffine_map=ZAffineMap(
+                transform=ZTransform(
                     projection=projection,
                     offset=offset + 1,
                 ),
@@ -371,14 +371,14 @@ class ZRangeMapTest(unittest.TestCase):
         )
         _assert_hash_eq(
             ZRangeMap(
-                zaffine_map=ZAffineMap(
+                transform=ZTransform(
                     projection=projection,
                     offset=offset,
                 ),
                 shape=shape,
             ),
             ZRangeMap(
-                zaffine_map=ZAffineMap(
+                transform=ZTransform(
                     projection=projection,
                     offset=offset,
                 ),
@@ -388,7 +388,7 @@ class ZRangeMapTest(unittest.TestCase):
 
     def test_point_to_range(self):
         rm = ZRangeMap(
-            zaffine_map=ZAffineMap(
+            transform=ZTransform(
                 projection=[[2, 0, 1], [0, 1, 1]],
                 offset=[-1, -1, 0],
             ),
@@ -404,7 +404,7 @@ class ZRangeMapTest(unittest.TestCase):
 
     def test_call(self):
         rm = ZRangeMap(
-            zaffine_map=ZAffineMap(
+            transform=ZTransform(
                 projection=[[-2, 0, 1], [0, 1, 1]],
                 offset=[-1, -1, 0],
             ),
@@ -422,7 +422,7 @@ class ZRangeMapTest(unittest.TestCase):
 
     def test_marginal(self):
         rm = ZRangeMap(
-            zaffine_map=ZAffineMap(
+            transform=ZTransform(
                 projection=[[1, 0, 1], [0, 2, 1]],
                 offset=[0, 0, 0],
             ),

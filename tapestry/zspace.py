@@ -1,5 +1,5 @@
 import functools
-from typing import List
+from typing import Iterable, List
 
 import numpy as np
 from marshmallow import fields
@@ -164,9 +164,9 @@ class ZRange(FrozenDoc):
 
 
 @dataclass
-class ZAffineMap(FrozenDoc):
+class ZTransform(FrozenDoc):
     """
-    Affine ℤ-Space map from one coordinate space to another.
+    Affine ℤ-Space index_map from one coordinate space to another.
     """
 
     __slots__ = ("projection", "offset")
@@ -199,7 +199,7 @@ class ZAffineMap(FrozenDoc):
         return ndarray_hash(self.projection) ^ ndarray_hash(self.offset)
 
     def __eq__(self, other) -> bool:
-        if not isinstance(other, ZAffineMap):
+        if not isinstance(other, ZTransform):
             return False
 
         return all(
@@ -235,27 +235,27 @@ class ZRangeMap(FrozenDoc):
     Map from ZRange in in_dim, to ZRange in out_dim.
     """
 
-    __slots__ = ("zaffine_map", "shape")
+    __slots__ = ("transform", "shape")
 
-    zaffine_map: ZAffineMap
+    transform: ZTransform
     shape: ZArray
 
-    def __init__(self, zaffine_map: ZAffineMap, shape):
+    def __init__(self, transform: ZTransform, shape: Iterable[int]):
         with self._thaw_context():
-            self.zaffine_map = zaffine_map
+            self.transform = transform
             self.shape = as_zarray(
                 shape,
                 ndim=1,
                 immutable=True,
             )
 
-        if self.zaffine_map.out_dim != self.shape.shape[0]:
+        if self.transform.out_dim != self.shape.shape[0]:
             raise ValueError(
-                f"Coord map out ndim ({self.zaffine_map.out_dim}) != shape ndim ({self.shape.shape[0]})"
+                f"Coord index_map out ndim ({self.transform.out_dim}) != shape ndim ({self.shape.shape[0]})"
             )
 
     def __hash__(self) -> int:
-        return hash(self.zaffine_map) ^ ndarray_hash(self.shape)
+        return hash(self.transform) ^ ndarray_hash(self.shape)
 
     def __eq__(self, other) -> bool:
         if not isinstance(other, ZRangeMap):
@@ -263,22 +263,22 @@ class ZRangeMap(FrozenDoc):
 
         return all(
             (
-                self.zaffine_map == other.zaffine_map,
+                self.transform == other.transform,
                 np.array_equal(self.shape, other.shape),
             )
         )
 
     @functools.cached_property
     def in_dim(self) -> int:
-        return self.zaffine_map.in_dim
+        return self.transform.in_dim
 
     @functools.cached_property
     def out_dim(self) -> int:
-        return self.zaffine_map.out_dim
+        return self.transform.out_dim
 
     @functools.cached_property
     def constant(self) -> bool:
-        return self.zaffine_map.constant
+        return self.transform.constant
 
     def point_to_range(self, coord) -> ZRange:
         """
@@ -291,7 +291,7 @@ class ZRangeMap(FrozenDoc):
                 f"Coord shape {coord.shape} != ZRangeMap in_dim ({self.in_dim},)"
             )
 
-        start = self.zaffine_map(coord)
+        start = self.transform(coord)
 
         return ZRange(start=start, end=start + self.shape)
 
@@ -318,7 +318,7 @@ class ZRangeMap(FrozenDoc):
         # We only really care as ndim grows.
 
         corners = sorted(
-            self.zaffine_map(zrange.inclusive_corners),
+            self.transform(zrange.inclusive_corners),
             key=lambda x: x.tolist(),
         )
 
@@ -335,11 +335,11 @@ class ZRangeMap(FrozenDoc):
         """
         Returns the marginal shape overlap of strides along each dim.
         """
-        return (self.shape - self.zaffine_map.marginal_strides()).clip(min=0)
+        return (self.shape - self.transform.marginal_strides()).clip(min=0)
 
     @functools.cache
     def marginal_waste(self) -> np.ndarray:
         """
         Returns the marginal waste of strides along each dim.
         """
-        return (self.zaffine_map.marginal_strides() - self.shape).clip(min=0)
+        return (self.transform.marginal_strides() - self.shape).clip(min=0)

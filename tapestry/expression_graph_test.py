@@ -8,9 +8,9 @@ from tapestry import attrs_docs, expression_graph
 from tapestry.testlib import eggs
 
 
-class DisjointAttrsDoc(attrs_docs.NodeAttrsDoc):
+class DisjointAttrs(attrs_docs.NodeAttrs):
     """
-    Test class which no other NodeAttrsDoc is a subclass of.
+    Test class which no other NodeAttrs is a subclass of.
     """
 
 
@@ -19,7 +19,7 @@ class DisjointNodeWrapper(expression_graph.NodeWrapper):
     Test class which no other NodeWrapper is a subclass of.
     """
 
-    attrs: DisjointAttrsDoc
+    attrs: DisjointAttrs
 
 
 class CommonNodeWrapperTestBase(unittest.TestCase):
@@ -28,11 +28,11 @@ class CommonNodeWrapperTestBase(unittest.TestCase):
     Wrapper class being tested.
     """
 
-    def example_doc(self) -> attrs_docs.NodeAttrsDoc:
+    def example_doc(self) -> attrs_docs.NodeAttrs:
         """
         Subclasses can override.
         """
-        return attrs_docs.NodeAttrsDoc(
+        return attrs_docs.NodeAttrs(
             node_id=uuid.uuid4(),
             display_name="foo",
         )
@@ -72,10 +72,10 @@ class CommonNodeWrapperTestBase(unittest.TestCase):
             hamcrest.instance_of(self.WRAPPER_CLASS),
         )
 
-        if attrs_class != attrs_docs.NodeAttrsDoc:
-            eggs.assert_false(node.wraps_doc_type(DisjointAttrsDoc))
+        if attrs_class != attrs_docs.NodeAttrs:
+            eggs.assert_false(node.wraps_doc_type(DisjointAttrs))
             eggs.assert_raises(
-                lambda: node.assert_wraps_doc_type(DisjointAttrsDoc),
+                lambda: node.assert_wraps_doc_type(DisjointAttrs),
                 ValueError,
             )
 
@@ -93,11 +93,11 @@ class NodeWrapperTest(CommonNodeWrapperTestBase):
     def test_eq_hash(self) -> None:
         g = expression_graph.ExpressionGraph()
 
-        foo = attrs_docs.NodeAttrsDoc(
+        foo = attrs_docs.NodeAttrs(
             node_id=uuid.uuid4(),
             display_name="foo",
         )
-        bar = attrs_docs.NodeAttrsDoc(
+        bar = attrs_docs.NodeAttrs(
             node_id=uuid.uuid4(),
             display_name="bar",
         )
@@ -140,7 +140,7 @@ class TensorSourceTest(CommonNodeWrapperTestBase):
     WRAPPER_CLASS = expression_graph.TensorSource
 
     @overrides
-    def example_doc(self) -> attrs_docs.NodeAttrsDoc:
+    def example_doc(self) -> attrs_docs.NodeAttrs:
         return attrs_docs.TensorSourceAttrs(
             node_id=uuid.uuid4(),
             display_name="foo",
@@ -151,7 +151,7 @@ class TensorValueTest(CommonNodeWrapperTestBase):
     WRAPPER_CLASS = expression_graph.TensorValue
 
     @overrides
-    def example_doc(self) -> attrs_docs.NodeAttrsDoc:
+    def example_doc(self) -> attrs_docs.NodeAttrs:
         return attrs_docs.TensorValueAttrs(
             node_id=uuid.uuid4(),
             display_name="foo",
@@ -162,7 +162,7 @@ class ExternalTensorValueTest(CommonNodeWrapperTestBase):
     WRAPPER_CLASS = expression_graph.ExternalTensorValue
 
     @overrides
-    def example_doc(self) -> attrs_docs.NodeAttrsDoc:
+    def example_doc(self) -> attrs_docs.NodeAttrs:
         return attrs_docs.ExternalTensorValueAttrs(
             node_id=uuid.uuid4(),
             display_name="foo",
