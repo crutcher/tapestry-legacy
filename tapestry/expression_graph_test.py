@@ -1,6 +1,5 @@
 import unittest
 import uuid
-from typing import Any, Dict, Type
 
 import hamcrest
 import numpy as np
@@ -16,7 +15,6 @@ from tapestry.expression_graph import (
     TensorSource,
     TensorValue,
 )
-from tapestry.serialization import json_testlib
 from tapestry.testlib import eggs
 
 
@@ -155,7 +153,7 @@ class TensorSourceTest(CommonNodeWrapperTestBase):
     def example_doc(self) -> NodeAttributes:
         return TensorSource(
             node_id=uuid.uuid4(),
-            shape=np.array([2, 3]),
+            shape=[2, 3],  # type: ignore
             dtype="torch.int64",
         )
 
@@ -167,7 +165,7 @@ class TensorValueTest(CommonNodeWrapperTestBase):
     def example_doc(self) -> NodeAttributes:
         return TensorValue(
             node_id=uuid.uuid4(),
-            shape=np.array([2, 3]),
+            shape=[2, 3],  # type: ignore
             dtype="torch.int64",
         )
 
@@ -288,52 +286,6 @@ class ExpressionGraphTest(unittest.TestCase):
             lambda: g.get_node(uuid.uuid4(), NodeHandle),
             KeyError,
         )
-
-
-class NodeAttrsDocTest(unittest.TestCase):
-    DOC_CLASS: Type[NodeAttributes] = NodeAttributes
-    """Overridable by subclasses."""
-
-    def expected_json(self, node_id: uuid.UUID) -> Dict[str, Any]:
-        return {
-            "node_id": str(node_id),
-            "display_name": "foo",
-        }
-
-    def test_lifecycle(self) -> None:
-        node_id = uuid.uuid4()
-        json = self.expected_json(node_id)
-        node = self.DOC_CLASS.load_json_data(json)
-
-        json_testlib.assert_json_serializable_roundtrip(
-            node,
-            json,
-        )
-
-
-class TensorSourceAttrsTest(NodeAttrsDocTest):
-    DOC_CLASS: Type[TensorSource] = TensorSource
-
-    def expected_json(self, node_id: uuid.UUID) -> Dict[str, Any]:
-        return {
-            **super().expected_json(node_id),
-            "shape": [2, 3],
-            "dtype": "torch.float16",
-        }
-
-
-class TensorValueAttrsTest(TensorSourceAttrsTest):
-    DOC_CLASS: Type[TensorValue] = TensorValue
-
-
-class ExternalTensorSourceAttrsTest(TensorValueAttrsTest):
-    DOC_CLASS = ExternalTensorValue
-
-    def expected_json(self, node_id: uuid.UUID) -> Dict[str, Any]:
-        return {
-            **super().expected_json(node_id),
-            "storage": "abc",
-        }
 
 
 class GraphDocTest(unittest.TestCase):

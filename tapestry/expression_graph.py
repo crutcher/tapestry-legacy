@@ -518,6 +518,9 @@ class TensorSource(NodeAttributes):
     shape: zspace.ZArray
     dtype: str
 
+    def __post_init__(self):
+        self.shape = zspace.as_zarray(self.shape)
+
 
 @marshmallow_dataclass.add_schema
 @dataclass(kw_only=True)
