@@ -3,6 +3,7 @@ import uuid
 from typing import Any, Dict, Type
 
 import hamcrest
+import numpy as np
 from overrides import overrides
 
 from tapestry.expression_graph import (
@@ -154,7 +155,8 @@ class TensorSourceTest(CommonNodeWrapperTestBase):
     def example_doc(self) -> NodeAttributes:
         return TensorSource(
             node_id=uuid.uuid4(),
-            display_name="foo",
+            shape=np.array([2, 3]),
+            dtype="torch.int64",
         )
 
 
@@ -165,7 +167,8 @@ class TensorValueTest(CommonNodeWrapperTestBase):
     def example_doc(self) -> NodeAttributes:
         return TensorValue(
             node_id=uuid.uuid4(),
-            display_name="foo",
+            shape=np.array([2, 3]),
+            dtype="torch.int64",
         )
 
 
@@ -176,7 +179,8 @@ class ExternalTensorValueTest(CommonNodeWrapperTestBase):
     def example_doc(self) -> NodeAttributes:
         return ExternalTensorValue(
             node_id=uuid.uuid4(),
-            display_name="foo",
+            shape=np.array([2, 3]),
+            dtype="torch.int64",
             storage="abc",
         )
 
@@ -188,12 +192,16 @@ class ExpressionGraphTest(unittest.TestCase):
         adoc = ExternalTensorValue(
             node_id=uuid.uuid4(),
             display_name="A",
+            shape=np.array([2, 3]),
+            dtype="torch.int64",
             storage="pre:A",
         )
         gdoc.add_node(adoc)
 
         bdoc = TensorValue(
             node_id=uuid.uuid4(),
+            shape=np.array([2, 3]),
+            dtype="torch.int64",
             display_name="B",
         )
         gdoc.add_node(bdoc)
@@ -230,12 +238,16 @@ class ExpressionGraphTest(unittest.TestCase):
         adoc = ExternalTensorValue(
             node_id=uuid.uuid4(),
             display_name="A",
+            shape=np.array([2, 3]),
+            dtype="torch.int64",
             storage="pre:A",
         )
         gdoc.add_node(adoc)
 
         bdoc = TensorValue(
             node_id=uuid.uuid4(),
+            shape=np.array([2, 3]),
+            dtype="torch.int64",
             display_name="B",
         )
         gdoc.add_node(bdoc)
@@ -300,20 +312,26 @@ class NodeAttrsDocTest(unittest.TestCase):
 
 
 class TensorSourceAttrsTest(NodeAttrsDocTest):
-    DOC_CLASS = TensorSource
+    DOC_CLASS: Type[TensorSource] = TensorSource
+
+    def expected_json(self, node_id: uuid.UUID) -> Dict[str, Any]:
+        return {
+            **super().expected_json(node_id),
+            "shape": [2, 3],
+            "dtype": "torch.float16",
+        }
 
 
-class TensorValueAttrsTest(NodeAttrsDocTest):
-    DOC_CLASS = TensorValue
+class TensorValueAttrsTest(TensorSourceAttrsTest):
+    DOC_CLASS: Type[TensorValue] = TensorValue
 
 
-class ExternalTensorSourceAttrsTest(NodeAttrsDocTest):
+class ExternalTensorSourceAttrsTest(TensorValueAttrsTest):
     DOC_CLASS = ExternalTensorValue
 
     def expected_json(self, node_id: uuid.UUID) -> Dict[str, Any]:
         return {
-            "node_id": str(node_id),
-            "display_name": "foo",
+            **super().expected_json(node_id),
             "storage": "abc",
         }
 
@@ -324,6 +342,8 @@ class GraphDocTest(unittest.TestCase):
         a = ExternalTensorValue(
             node_id=uuid.uuid4(),
             display_name="A",
+            shape=np.array([2, 3]),
+            dtype="torch.int64",
             storage="pre:A",
         )
         g.add_node(a)
@@ -336,6 +356,8 @@ class GraphDocTest(unittest.TestCase):
         b = TensorValue(
             node_id=uuid.uuid4(),
             display_name="B",
+            shape=np.array([2, 3]),
+            dtype="torch.int64",
         )
         g.add_node(b)
 
@@ -394,6 +416,8 @@ class GraphDocTest(unittest.TestCase):
         a = ExternalTensorValue(
             node_id=uuid.uuid4(),
             display_name="A",
+            shape=np.array([2, 3]),
+            dtype="torch.int64",
             storage="pre:A",
         )
         g.add_node(a)
@@ -401,6 +425,8 @@ class GraphDocTest(unittest.TestCase):
         b = TensorValue(
             node_id=uuid.uuid4(),
             display_name="B",
+            shape=np.array([2, 3]),
+            dtype="torch.int64",
         )
         g.add_node(b)
 

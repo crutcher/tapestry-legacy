@@ -1,3 +1,4 @@
+import json
 from typing import Any, ClassVar, Optional, Type, TypeVar
 
 import marshmallow
@@ -19,8 +20,12 @@ class JsonDumpable:
     def get_dump_schema(self) -> marshmallow.Schema:
         raise NotImplementedError("Subclass Implements")
 
-    def dump_json_data(self) -> Any:
-        return self.get_dump_schema().dump(self)
+    def dump_json_data(self, *, reencode: bool = True) -> Any:
+        # re-export to json to remove OrderedDict
+        data = self.get_dump_schema().dump(self)
+        if reencode:
+            data = json.loads(json.dumps(data))
+        return data
 
     def dump_json_str(
         self,

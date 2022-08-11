@@ -1,4 +1,5 @@
 import copy
+import html
 import typing
 import uuid
 from dataclasses import asdict, dataclass, field
@@ -6,10 +7,12 @@ from typing import Dict, Iterable, List, Optional, Type, TypeVar, Union, cast
 
 import marshmallow
 import marshmallow_dataclass
+import pydot
 from marshmallow import fields
 from marshmallow_oneofschema import OneOfSchema
 from overrides import overrides
 
+from tapestry import zspace
 from tapestry.serialization.json_serializable import JsonDumpable, JsonLoadable
 from tapestry.type_utils import UUIDConvertable, coerce_uuid, dict_to_parameter_str
 
@@ -26,6 +29,10 @@ class NodeAttributes(JsonLoadable):
     display_name: Optional[str] = None
     """May be repeated in a document."""
 
+    @classmethod
+    def node_type(cls) -> str:
+        return cls.__name__
+
 
 @marshmallow_dataclass.add_schema
 @dataclass(kw_only=True)
@@ -34,11 +41,12 @@ class EdgeAttributes(NodeAttributes):
     target_node_id: uuid.UUID
 
 
-W = TypeVar("W", bound="NodeHandle")
+NodeAttributesT = TypeVar("NodeAttributesT", bound="NodeAttributes")
+NodeHandleT = TypeVar("NodeHandleT", bound="NodeHandle")
 
 
 # See forward references:
-#  * TypeVar W
+#  * TypeVar NodeHandleT
 class NodeHandle:
     """
     Base class for node handles of NodeAttributes.
@@ -152,7 +160,7 @@ class NodeHandle:
     def __str__(self):
         return repr(self)
 
-    def force_as_type(self, handle_type: Type[W]) -> W:
+    def force_as_type(self, handle_type: Type[NodeHandleT]) -> NodeHandleT:
         """
         Construct a new wrapper for `.attrs` of the given type, or throw.
 
@@ -165,7 +173,7 @@ class NodeHandle:
             attrs=self.attrs,
         )
 
-    def try_as_type(self, handle_type: Type[W]) -> Optional[W]:
+    def try_as_type(self, handle_type: Type[NodeHandleT]) -> Optional[NodeHandleT]:
         """
         Try to construct a new wrapper for `.attrs`, or return None.
 
@@ -189,6 +197,34 @@ class NodeHandle:
             graph=self.graph,
             attrs=self.attrs,
         )
+
+
+class EdgeHandle(NodeHandle):
+    attrs: EdgeAttributes
+
+    def __init__(
+        self,
+        *,
+        graph: "GraphHandle",
+        attrs: EdgeAttributes,
+    ):
+        assert isinstance(attrs, EdgeAttributes), type(attrs)
+        super().__init__(
+            graph=graph,
+            attrs=attrs,
+        )
+
+    def source(self) -> NodeHandle:
+        return self.graph.get_node(self.attrs.source_node_id, NodeHandle)
+
+    def source_as(self, handle_type: Type[NodeHandleT]) -> NodeHandleT:
+        return self.graph.get_node(self.attrs.source_node_id, handle_type)
+
+    def target(self) -> NodeHandle:
+        return self.graph.get_node(self.attrs.target_node_id, NodeHandle)
+
+    def target_as(self, handle_type: Type[NodeHandleT]) -> NodeHandleT:
+        return self.graph.get_node(self.attrs.target_node_id, handle_type)
 
 
 @dataclass
@@ -284,7 +320,7 @@ class GraphDoc(JsonDumpable):
             for n in nodes.values():
                 self.add_node(n)
 
-    def add_node(self, node: NodeAttributes) -> None:
+    def add_node(self, node: NodeAttributesT) -> NodeAttributesT:
         """
         Add a node to the document.
 
@@ -313,6 +349,8 @@ class GraphDoc(JsonDumpable):
 
         self.nodes[node.node_id] = node
 
+        return node
+
     def assert_node_types(
         self,
         node_types: Iterable[Type[NodeAttributes]],
@@ -330,6 +368,83 @@ class GraphDoc(JsonDumpable):
         if violations:
             names = ", ".join(sorted(cls.__name__ for cls in violations))
             raise ValueError(f"Illegal node types found: [{names}]")
+
+    def to_dot(self, *, omit_ids: bool = True) -> pydot.Dot:
+        def format_data_table_row(data: dict) -> str:
+            return "".join(
+                (
+                    f'<tr><td align="right"><b>{k}:</b></td>'
+                    f'<td align="left">{format_data(v)}</td></tr>'
+                )
+                for k, v in data.items()
+            )
+
+        def format_data(data):
+            if isinstance(data, dict):
+                return f"""<table border="0" cellborder="1" cellspacing="0">{format_data_table_row(data)}</table>"""
+
+            else:
+                return html.escape(str(data))
+
+        dot = pydot.Dot("G", graph_type="digraph", bgcolor="red")
+        dot.set_graph_defaults(bgcolor="white")
+        dot.set_graph_defaults(rankdir="RL")
+        for node in self.nodes.values():
+            node_type = type(node).__name__
+
+            data = node.dump_json_data()
+            is_edge = isinstance(node, EdgeAttributes)
+
+            if omit_ids:
+                del data["node_id"]
+
+                if is_edge:
+                    del data["source_node_id"]
+                    del data["target_node_id"]
+
+            null_keys = [k for k, v in data.items() if v is None]
+            for k in null_keys:
+                del data[k]
+
+            title = node_type
+            if is_edge:
+                title = f"Edge: {title}"
+
+            label = f"""
+                <table border="0" cellborder="1" cellspacing="0">
+                  <tr><td colspan="2">{title}</td></tr>
+                  {format_data_table_row(data)}
+                  </table>
+            """
+            shape = "plain"
+            if is_edge:
+                shape = "rectangle"
+
+            dot.add_node(
+                pydot.Node(
+                    str(node.node_id),
+                    label=f"<{label}>",
+                    shape=shape,
+                ),
+            )
+
+        for node in self.nodes.values():
+            if isinstance(node, EdgeAttributes):
+                dot.add_edge(
+                    pydot.Edge(
+                        str(node.source_node_id),
+                        str(node.node_id),
+                        arrowhead="none",
+                    ),
+                )
+                dot.add_edge(
+                    pydot.Edge(
+                        str(node.node_id),
+                        str(node.target_node_id),
+                    ),
+                )
+
+        return dot
 
 
 class GraphHandle:
@@ -349,7 +464,7 @@ class GraphHandle:
     def __str__(self):
         return str(self.doc.pretty())
 
-    def all_handles_of_type(self, handle_type: Type[W]) -> List[W]:
+    def all_handles_of_type(self, handle_type: Type[NodeHandleT]) -> List[NodeHandleT]:
         """
         List all nodes wrappable by the given wrapper type.
 
@@ -372,8 +487,8 @@ class GraphHandle:
     def get_node(
         self,
         node_id: UUIDConvertable,
-        handle_type: Type[W],
-    ) -> W:
+        handle_type: Type[NodeHandleT],
+    ) -> NodeHandleT:
         """
         Find a NodeAttributes by node_id, and wrap it in the given node type.
 
@@ -400,6 +515,9 @@ class TensorSource(NodeAttributes):
     class Handle(NodeHandle):
         attrs: "TensorSource"
 
+    shape: zspace.ZArray
+    dtype: str
+
 
 @marshmallow_dataclass.add_schema
 @dataclass(kw_only=True)
@@ -415,3 +533,30 @@ class ExternalTensorValue(TensorValue):
         attrs: "ExternalTensorValue"
 
     storage: str
+
+
+@marshmallow_dataclass.add_schema
+@dataclass(kw_only=True)
+class BlockOperation(NodeAttributes):
+    class Handle(NodeHandle):
+        attrs: "BlockOperation"
+
+    index_space: zspace.ZRange
+
+    @marshmallow_dataclass.add_schema
+    @dataclass(kw_only=True)
+    class BindTensor(EdgeAttributes):
+        class Handle(EdgeHandle):
+            attrs: "BlockOperation.BindTensor"
+
+        selector: zspace.ZRangeMap
+
+    @marshmallow_dataclass.add_schema
+    @dataclass(kw_only=True)
+    class BlockInput(BindTensor):
+        pass
+
+    @marshmallow_dataclass.add_schema
+    @dataclass(kw_only=True)
+    class BlockOutput(BindTensor):
+        pass
