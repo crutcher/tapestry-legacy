@@ -49,5 +49,7 @@ if (( ${#NB_TARGETS[@]} )); then
     if ! black_nbconvert --check "$f" > /dev/null; then
       black_nbconvert "$f"
     fi
+    # isort will support this, soon: 
+    # isort "$f" --treat-comment-as-code "# %%"
   done
 fi
