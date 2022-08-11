@@ -531,6 +531,13 @@ class TensorValue(TensorSource):
 
 @marshmallow_dataclass.add_schema
 @dataclass(kw_only=True)
+class TensorResult(TensorValue):
+    class Handle(TensorSource.Handle):
+        attrs: "TensorResult"
+
+
+@marshmallow_dataclass.add_schema
+@dataclass(kw_only=True)
 class ExternalTensorValue(TensorValue):
     class Handle(TensorValue.Handle):
         attrs: "ExternalTensorValue"
