@@ -38,8 +38,8 @@ def f(
 
     graph.add_node(
         BlockOperation.Input(
-            source_node_id=op.node_id,
-            target_node_id=x.node_id,
+            source_id=op.node_id,
+            target_id=x.node_id,
             selector=ZRangeMap.identity_map(shape=[1, 2]),
             name="x",
         )
@@ -47,8 +47,8 @@ def f(
 
     graph.add_node(
         BlockOperation.Input(
-            source_node_id=op.node_id,
-            target_node_id=w.node_id,
+            source_id=op.node_id,
+            target_id=w.node_id,
             selector=ZRangeMap.constant_map(2, shape=w.shape),
             name="w",
         )
@@ -56,8 +56,8 @@ def f(
 
     graph.add_node(
         BlockOperation.Result(
-            source_node_id=y.node_id,
-            target_node_id=op.node_id,
+            source_id=y.node_id,
+            target_id=op.node_id,
             selector=ZRangeMap.identity_map(y.shape),
             name="y",
         ),
@@ -88,6 +88,8 @@ def raw():
     )
 
     y = f(x, w)
+
+    g.validate()
 
     print(g.pretty())
 

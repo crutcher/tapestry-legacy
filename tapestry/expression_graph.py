@@ -1,6 +1,7 @@
 import copy
 from dataclasses import dataclass, field
 import html
+import typing
 from typing import (
     Any,
     Dict,
@@ -48,6 +49,9 @@ class TapestryNode(JsonLoadable):
 
     name: Optional[str] = None
 
+    def validate(self) -> None:
+        self.assert_graph()
+
     def clone(self: _TapestryNodeT) -> _TapestryNodeT:
         val = copy.deepcopy(self)
         del val.graph
@@ -89,34 +93,53 @@ class TapestryNode(JsonLoadable):
 @marshmallow_dataclass.add_schema
 @dataclass(kw_only=True)
 class TapestryEdge(TapestryNode):
-    source_node_id: uuid.UUID
-    target_node_id: uuid.UUID
+    class Constraint:
+        SOURCE_TYPE: TapestryNode
+        TARGET_TYPE: TapestryNode
+
+    source_id: uuid.UUID
+    target_id: uuid.UUID
 
     @overload
     def source(self) -> TapestryNode:
         ...
 
     @overload
-    def source(self, node_type: Type[_TapestryNodeT]) -> _TapestryNodeT:
+    def source(
+        self,
+        node_type: Type[_TapestryNodeT],
+    ) -> _TapestryNodeT:
         ...
 
     def source(
-        self, node_type: Type[TapestryNode | _TapestryNodeT] = TapestryNode
+        self,
+        node_type: Type[TapestryNode | _TapestryNodeT] = TapestryNode,
     ) -> Union[TapestryNode, _TapestryNodeT]:
-        return self.assert_graph().get_node(self.source_node_id, node_type)
+        return self.assert_graph().get_node(self.source_id, node_type)
 
     @overload
     def target(self) -> TapestryNode:
         ...
 
     @overload
-    def target(self, node_type: Type[_TapestryNodeT]) -> _TapestryNodeT:
+    def target(
+        self,
+        node_type: Type[_TapestryNodeT],
+    ) -> _TapestryNodeT:
         ...
 
     def target(
-        self, node_type: Type[TapestryNode | _TapestryNodeT] = TapestryNode
+        self,
+        node_type: Type[TapestryNode | _TapestryNodeT] = TapestryNode,
     ) -> Union[TapestryNode, _TapestryNodeT]:
-        return self.assert_graph().get_node(self.target_node_id, node_type)
+        return self.assert_graph().get_node(self.target_id, node_type)
+
+    @overrides
+    def validate(self) -> None:
+        super(TapestryEdge, self).validate()
+        hints = typing.get_type_hints(self.Constraint)
+        assert isinstance(self.source(), hints["SOURCE_TYPE"]), hints
+        assert isinstance(self.target(), hints["TARGET_TYPE"])
 
 
 @dataclass
@@ -163,11 +186,11 @@ class TapestryGraph(JsonDumpable):
             @marshmallow.post_dump
             def post_dump(self, data, **kwargs):
                 nodes = data["nodes"]
-                edges = [node for node in nodes.values() if "source_node_id" in node]
+                edges = [node for node in nodes.values() if "source_id" in node]
                 for edge in edges:
                     del nodes[edge["node_id"]]
 
-                    source_node = nodes[edge["source_node_id"]]
+                    source_node = nodes[edge["source_id"]]
 
                     if EDGES_FIELD not in source_node:
                         source_node[EDGES_FIELD] = []
@@ -217,6 +240,10 @@ class TapestryGraph(JsonDumpable):
         if nodes is not None:
             for n in nodes.values():
                 self.add_node(n)
+
+    def validate(self) -> None:
+        for node in self.nodes.values():
+            node.validate()
 
     def clone(self) -> "TapestryGraph":
         """
@@ -350,8 +377,8 @@ class TapestryGraph(JsonDumpable):
         return [
             node
             for node in self.list_nodes(edge_type)
-            if source_id is None or node.source_node_id == source_id
-            if target_id is None or node.target_node_id == target_id
+            if source_id is None or node.source_id == source_id
+            if target_id is None or node.target_id == target_id
         ]
 
     def add_node(self, node: _TapestryNodeT) -> _TapestryNodeT:
@@ -367,7 +394,7 @@ class TapestryGraph(JsonDumpable):
             raise ValueError(f"Node {node.node_id} already in graph.")
 
         if isinstance(node, TapestryEdge):
-            for port in ("source_node_id", "target_node_id"):
+            for port in ("source_id", "target_id"):
                 port_id = getattr(node, port)
                 if port_id not in self.nodes:
                     raise ValueError(
@@ -467,7 +494,7 @@ class TapestryGraph(JsonDumpable):
             if isinstance(node, TapestryEdge):
                 dot.add_edge(
                     pydot.Edge(
-                        str(node.source_node_id),
+                        str(node.source_id),
                         str(node.node_id),
                         arrowhead="none",
                     ),
@@ -475,7 +502,7 @@ class TapestryGraph(JsonDumpable):
                 dot.add_edge(
                     pydot.Edge(
                         str(node.node_id),
-                        str(node.target_node_id),
+                        str(node.target_id),
                     ),
                 )
 
@@ -522,12 +549,14 @@ class BlockOperation(TapestryNode):
     @marshmallow_dataclass.add_schema
     @dataclass(kw_only=True)
     class Input(TensorBinding):
-        pass
+        class Constraint(TapestryEdge.Constraint):
+            SOURCE_TYPE: "BlockOperation"
 
     @marshmallow_dataclass.add_schema
     @dataclass(kw_only=True)
     class Result(TensorBinding):
-        pass
+        class Constraint(TapestryEdge.Constraint):
+            TARGET_TYPE: "BlockOperation"
 
     def inputs(self) -> List[Input]:
         return self.assert_graph().list_edges(

@@ -266,6 +266,12 @@ class ZTransform(FrozenDoc):
     def is_constant(self) -> bool:
         return (self.projection == 0).all()
 
+    @functools.cached_property
+    def is_identity(self) -> bool:
+        if self.projection.shape[0] != self.projection.shape[1]:
+            return False
+        return (self.projection == np.identity(self.projection.shape[0])).all()
+
     def __call__(self, coords) -> np.ndarray:
         return np.matmul(coords, self.projection) + self.offset
 

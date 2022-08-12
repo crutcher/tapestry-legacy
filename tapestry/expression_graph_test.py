@@ -190,8 +190,8 @@ class TapestryGraphTest(unittest.TestCase):
         edge_node = TapestryEdge(
             node_id=uuid.uuid4(),
             name="child",
-            source_node_id=a.node_id,
-            target_node_id=b.node_id,
+            source_id=a.node_id,
+            target_id=b.node_id,
         )
         g.add_node(edge_node)
 
@@ -284,34 +284,34 @@ class TapestryGraphTest(unittest.TestCase):
         edge_node = TapestryEdge(
             node_id=uuid.uuid4(),
             name="bar",
-            source_node_id=foo_node.node_id,
-            target_node_id=foo_node.node_id,
+            source_id=foo_node.node_id,
+            target_id=foo_node.node_id,
         )
         g.add_node(edge_node)
 
         illegal_source = TapestryEdge(
             node_id=uuid.uuid4(),
             name="illegal",
-            source_node_id=edge_node.node_id,
-            target_node_id=foo_node.node_id,
+            source_id=edge_node.node_id,
+            target_id=foo_node.node_id,
         )
         missing_source = TapestryEdge(
             node_id=uuid.uuid4(),
             name="illegal",
-            source_node_id=uuid.uuid4(),
-            target_node_id=foo_node.node_id,
+            source_id=uuid.uuid4(),
+            target_id=foo_node.node_id,
         )
         illegal_target = TapestryEdge(
             node_id=uuid.uuid4(),
             name="illegal",
-            source_node_id=foo_node.node_id,
-            target_node_id=edge_node.node_id,
+            source_id=foo_node.node_id,
+            target_id=edge_node.node_id,
         )
         missing_target = TapestryEdge(
             node_id=uuid.uuid4(),
             name="illegal",
-            source_node_id=foo_node.node_id,
-            target_node_id=uuid.uuid4(),
+            source_id=foo_node.node_id,
+            target_id=uuid.uuid4(),
         )
 
         for bad in (illegal_source, missing_source, illegal_target, missing_target):
