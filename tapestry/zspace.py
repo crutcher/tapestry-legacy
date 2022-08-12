@@ -177,7 +177,7 @@ class ZTransform(FrozenDoc):
     """The offset vector."""
 
     @classmethod
-    def identity(cls, n_dim: int, offset=None):
+    def identity_transform(cls, n_dim: int, offset=None) -> "ZTransform":
         """
         Construct an identity transform in the given dimensions.
 
@@ -190,6 +190,34 @@ class ZTransform(FrozenDoc):
 
         return ZTransform(
             projection=np.identity(n_dim, dtype=int),
+            offset=offset,
+        )
+
+    @classmethod
+    def constant_transform(
+        cls,
+        input_dim: int,
+        *,
+        out_dim: int = None,
+        offset=None,
+    ) -> "ZTransform":
+        """
+        Construct an identity transform in the given dimensions.
+
+        :param n_dim: number of dimensions.
+        :param offset: (optional) offset, defaults to [0, ...].
+        :return: a new ZTransform.
+        """
+        if out_dim is None and offset is None:
+            raise ValueError("offset and out_dim are mutually exclusive")
+        if not (out_dim is None or offset is None):
+            raise ValueError("One of offset or out_dim is required")
+
+        if out_dim is not None:
+            offset = np.zeros((out_dim,), dtype=int)
+
+        return ZTransform(
+            projection=np.zeros((input_dim, len(offset)), dtype=int),
             offset=offset,
         )
 
@@ -235,7 +263,7 @@ class ZTransform(FrozenDoc):
         return self.projection.shape[1]
 
     @functools.cached_property
-    def constant(self) -> bool:
+    def is_constant(self) -> bool:
         return (self.projection == 0).all()
 
     def __call__(self, coords) -> np.ndarray:
@@ -258,10 +286,34 @@ class ZRangeMap(FrozenDoc):
     shape: ZArray
 
     @classmethod
-    def identity(cls, shape=None, *, offset=None):
+    def identity_map(
+        cls,
+        shape=None,
+        *,
+        offset=None,
+    ) -> "ZRangeMap":
         return ZRangeMap(
-            transform=ZTransform.identity(
+            transform=ZTransform.identity_transform(
                 n_dim=len(shape),
+                offset=offset,
+            ),
+            shape=shape,
+        )
+
+    @classmethod
+    def constant_map(
+        cls,
+        input_dim: int,
+        *,
+        shape,
+        offset=None,
+    ) -> "ZRangeMap":
+        if offset is None:
+            offset = np.zeros(len(shape), dtype=int)
+
+        return ZRangeMap(
+            transform=ZTransform.constant_transform(
+                input_dim=input_dim,
                 offset=offset,
             ),
             shape=shape,
@@ -305,7 +357,7 @@ class ZRangeMap(FrozenDoc):
 
     @functools.cached_property
     def constant(self) -> bool:
-        return self.transform.constant
+        return self.transform.is_constant
 
     def point_to_range(self, coord) -> ZRange:
         """

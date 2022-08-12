@@ -2,109 +2,94 @@ import numpy as np
 
 from tapestry.expression_graph import (
     BlockOperation,
-    ExternalTensorValue,
-    GraphHandle,
+    ExternalTensor,
+    TapestryGraph,
     TensorResult,
     TensorValue,
 )
-from tapestry.zspace import ZRange, ZRangeMap, ZTransform
+from tapestry.zspace import ZRange, ZRangeMap
 
 
 def f(
-    x: TensorValue.Handle,
-    w: TensorValue.Handle,
-) -> TensorResult.Handle:
-    graph = x.graph
+    x: TensorValue,
+    w: TensorValue,
+) -> TensorResult:
+    graph = x.assert_graph()
     assert w.graph == graph
 
-    x_shape = x.attrs.shape
-    w_shape = w.attrs.shape
+    assert x.shape[-1] == w.shape[0]
 
-    assert x_shape[-1] == w_shape[0]
-    y = graph.doc.add_node(
+    y_shape = np.append(x.shape[:-1], w.shape[1])
+
+    y = graph.add_node(
         TensorResult(
-            display_name="Y",
-            shape=np.array([100, 3]),
+            name="Y",
+            shape=y_shape,
             dtype="torch.float16",
         )
     )
 
-    op = graph.doc.add_node(
+    op = graph.add_node(
         BlockOperation(
-            display_name="Linear",
-            index_space=ZRange([2, 3]),
+            name="Linear",
+            index_space=ZRange(y_shape),
         )
     )
 
-    graph.doc.add_node(
-        BlockOperation.BlockInput(
+    graph.add_node(
+        BlockOperation.Input(
             source_node_id=op.node_id,
             target_node_id=x.node_id,
-            selector=ZRangeMap(
-                transform=ZTransform(
-                    projection=[[2, 0], [0, 1]],
-                    offset=[-1, 0],
-                ),
-                shape=x.attrs.shape,
-            ),
+            selector=ZRangeMap.identity_map(shape=[1, 2]),
+            name="x",
         )
     )
 
-    graph.doc.add_node(
-        BlockOperation.BlockInput(
+    graph.add_node(
+        BlockOperation.Input(
             source_node_id=op.node_id,
             target_node_id=w.node_id,
-            selector=ZRangeMap(
-                transform=ZTransform(
-                    projection=[[0, 0], [0, 0]],
-                    offset=[0, 0],
-                ),
-                shape=w.attrs.shape,
-            ),
+            selector=ZRangeMap.constant_map(2, shape=w.shape),
+            name="w",
         )
     )
 
-    graph.doc.add_node(
-        BlockOperation.BlockOutput(
+    graph.add_node(
+        BlockOperation.Result(
             source_node_id=y.node_id,
             target_node_id=op.node_id,
-            selector=ZRangeMap.identity(y.shape),
+            selector=ZRangeMap.identity_map(y.shape),
+            name="y",
         ),
     )
 
-    return TensorResult.Handle(
-        graph=graph,
-        attrs=y,
-    )
+    return y
 
 
 def raw():
-    g = GraphHandle()
+    g = TapestryGraph()
 
-    x_attrs = g.doc.add_node(
-        ExternalTensorValue(
-            display_name="X",
+    x = g.add_node(
+        ExternalTensor(
+            name="X",
             shape=[100, 2],
             dtype="torch.float16",
             storage="store:x",
         )
     )
 
-    w_attrs = g.doc.add_node(
-        ExternalTensorValue(
-            display_name="W",
+    w = g.add_node(
+        ExternalTensor(
+            name="W",
             shape=[2, 3],
             dtype="torch.float16",
             storage="store:w",
         )
     )
 
-    y = f(
-        g.get_node(x_attrs.node_id, TensorValue.Handle),
-        g.get_node(w_attrs.node_id, TensorValue.Handle),
-    )
+    y = f(x, w)
 
-    print(g.doc.pretty())
+    print(g.pretty())
 
 
 if __name__ == "__main__":

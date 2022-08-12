@@ -3,297 +3,171 @@ import uuid
 
 import hamcrest
 import numpy as np
-from overrides import overrides
 
 from tapestry.expression_graph import (
-    EdgeAttributes,
-    ExternalTensorValue,
-    GraphDoc,
-    GraphHandle,
-    NodeAttributes,
-    NodeHandle,
-    TensorSource,
+    ExternalTensor,
+    TapestryEdge,
+    TapestryGraph,
+    TapestryNode,
+    TensorResult,
     TensorValue,
 )
 from tapestry.testlib import eggs
 
 
-class DisjointAttributes(NodeAttributes):
+class DisjointAttributes(TapestryNode):
     """
     Test class which no other NodeAttributes is a subclass of.
     """
 
 
-class DisjointNodeHandle(NodeHandle):
-    """
-    Test class which no other NodeHandle is a subclass of.
-    """
+class TapestryNodeTest(unittest.TestCase):
+    def test_clone(self) -> None:
+        g = TapestryGraph()
 
-    attrs: DisjointAttributes
-
-
-class CommonNodeWrapperTestBase(unittest.TestCase):
-    HANDLE_CLASS = NodeHandle
-    """
-    Wrapper class being tested.
-    """
-
-    def example_doc(self) -> NodeAttributes:
-        """
-        Subclasses can override.
-        """
-        return NodeAttributes(
-            node_id=uuid.uuid4(),
-            display_name="foo",
-        )
-
-    def test_common_construction(self) -> None:
-        g = GraphHandle()
-
-        attrs = self.example_doc()
-        attrs_class = type(attrs)
-
-        node = self.HANDLE_CLASS(
-            graph=g,
-            attrs=attrs,
-        )
-
-        eggs.assert_true(node.wraps_doc_type(attrs_class))
-        node.assert_wraps_doc_type(attrs_class)
+        node = TapestryNode()
 
         eggs.assert_match(
-            node.try_as_type(NodeHandle),
-            hamcrest.instance_of(NodeHandle),
-        )
-        eggs.assert_match(
-            node.force_as_type(NodeHandle),
-            hamcrest.instance_of(NodeHandle),
-        )
-
-        eggs.assert_true(node.wraps_doc_type(attrs_class))
-        node.assert_wraps_doc_type(attrs_class)
-
-        eggs.assert_match(
-            node.try_as_type(self.HANDLE_CLASS),
-            hamcrest.instance_of(self.HANDLE_CLASS),
-        )
-        eggs.assert_match(
-            node.force_as_type(self.HANDLE_CLASS),
-            hamcrest.instance_of(self.HANDLE_CLASS),
-        )
-
-        if attrs_class != NodeAttributes:
-            eggs.assert_false(node.wraps_doc_type(DisjointAttributes))
-            eggs.assert_raises(
-                lambda: node.assert_wraps_doc_type(DisjointAttributes),
-                ValueError,
-            )
-
-        eggs.assert_match(
-            node.try_as_type(DisjointNodeHandle),
+            node.graph,
             hamcrest.none(),
         )
-        eggs.assert_raises(
-            lambda: node.force_as_type(DisjointNodeHandle),
-            ValueError,
-        )
 
-
-class NodeWrapperTest(CommonNodeWrapperTestBase):
-    def test_eq_hash(self) -> None:
-        g = GraphHandle()
-
-        foo = NodeAttributes(
-            node_id=uuid.uuid4(),
-            display_name="foo",
-        )
-        bar = NodeAttributes(
-            node_id=uuid.uuid4(),
-            display_name="bar",
-        )
-
-        foo_node_1 = NodeHandle(
-            graph=g,
-            attrs=foo,
-        )
-        foo_node_2 = NodeHandle(
-            graph=g,
-            attrs=foo,
-        )
-        bar_node = NodeHandle(
-            graph=g,
-            attrs=bar,
-        )
+        node.graph = g
 
         eggs.assert_match(
-            foo_node_1,
-            foo_node_2,
+            node.graph,
+            g,
         )
+
+        clone = node.clone()
+        eggs.assert_match(
+            clone.graph,
+            hamcrest.none(),
+        )
+
+
+class TapestryGraphTest(unittest.TestCase):
+    def test_clone(self) -> None:
+        g = TapestryGraph()
+        node = g.add_node(TapestryNode())
+
+        clone = g.clone()
+
+        eggs.assert_match(g, hamcrest.not_(hamcrest.same_instance(clone)))
 
         eggs.assert_match(
-            hash(foo_node_1),
-            hash(foo_node_2),
+            clone.get_node(node.node_id),
+            hamcrest.all_of(
+                hamcrest.not_(hamcrest.same_instance(node)),
+                hamcrest.has_property("node_id", node.node_id),
+            ),
         )
 
-        eggs.assert_match(
-            foo_node_1,
-            hamcrest.not_(bar_node),
-        )
-
-        eggs.assert_match(
-            hash(foo_node_1),
-            hamcrest.not_(hash(bar_node)),
-        )
-
-
-class TensorSourceTest(CommonNodeWrapperTestBase):
-    HANDLE_CLASS = TensorSource.Handle
-
-    @overrides
-    def example_doc(self) -> NodeAttributes:
-        return TensorSource(
-            node_id=uuid.uuid4(),
-            shape=[2, 3],  # type: ignore
-            dtype="torch.int64",
-        )
-
-
-class TensorValueTest(CommonNodeWrapperTestBase):
-    HANDLE_CLASS = TensorValue.Handle
-
-    @overrides
-    def example_doc(self) -> NodeAttributes:
-        return TensorValue(
-            node_id=uuid.uuid4(),
-            shape=[2, 3],  # type: ignore
-            dtype="torch.int64",
-        )
-
-
-class ExternalTensorValueTest(CommonNodeWrapperTestBase):
-    HANDLE_CLASS = ExternalTensorValue.Handle
-
-    @overrides
-    def example_doc(self) -> NodeAttributes:
-        return ExternalTensorValue(
-            node_id=uuid.uuid4(),
-            shape=np.array([2, 3]),
-            dtype="torch.int64",
-            storage="abc",
-        )
-
-
-class ExpressionGraphTest(unittest.TestCase):
     def test_list_nodes_of_type(self) -> None:
-        gdoc = GraphDoc()
+        g = TapestryGraph()
 
-        adoc = ExternalTensorValue(
+        adoc = ExternalTensor(
             node_id=uuid.uuid4(),
-            display_name="A",
+            name="A",
             shape=np.array([2, 3]),
             dtype="torch.int64",
             storage="pre:A",
         )
-        gdoc.add_node(adoc)
+        g.add_node(adoc)
 
         bdoc = TensorValue(
             node_id=uuid.uuid4(),
             shape=np.array([2, 3]),
             dtype="torch.int64",
-            display_name="B",
+            name="B",
         )
-        gdoc.add_node(bdoc)
-
-        g = GraphHandle(gdoc)
+        g.add_node(bdoc)
 
         eggs.assert_match(
-            g.all_handles_of_type(NodeHandle),
+            g.list_nodes(),
             hamcrest.contains_inanyorder(
                 hamcrest.all_of(
-                    hamcrest.instance_of(NodeHandle),
-                    hamcrest.has_property("attrs", adoc),
+                    hamcrest.instance_of(ExternalTensor),
+                    hamcrest.has_property("name", "A"),
                 ),
                 hamcrest.all_of(
-                    hamcrest.instance_of(NodeHandle),
-                    hamcrest.has_property("attrs", bdoc),
+                    hamcrest.instance_of(TensorValue),
+                    hamcrest.instance_of(TapestryNode),
+                    hamcrest.has_property("name", "B"),
                 ),
             ),
         )
 
         eggs.assert_match(
-            g.all_handles_of_type(ExternalTensorValue.Handle),
-            hamcrest.contains_inanyorder(
+            g.list_nodes(ExternalTensor),
+            hamcrest.only_contains(
                 hamcrest.all_of(
-                    hamcrest.instance_of(ExternalTensorValue.Handle),
-                    hamcrest.has_property("attrs", adoc),
+                    hamcrest.instance_of(ExternalTensor),
+                    hamcrest.has_property("name", "A"),
                 ),
             ),
         )
 
     def test_get_node(self) -> None:
-        gdoc = GraphDoc()
+        g = TapestryGraph()
 
-        adoc = ExternalTensorValue(
+        adoc = ExternalTensor(
             node_id=uuid.uuid4(),
-            display_name="A",
+            name="A",
             shape=np.array([2, 3]),
             dtype="torch.int64",
             storage="pre:A",
         )
-        gdoc.add_node(adoc)
+        g.add_node(adoc)
 
         bdoc = TensorValue(
             node_id=uuid.uuid4(),
             shape=np.array([2, 3]),
             dtype="torch.int64",
-            display_name="B",
+            name="B",
         )
-        gdoc.add_node(bdoc)
-
-        g = GraphHandle(gdoc)
+        g.add_node(bdoc)
 
         # uuid lookup
         eggs.assert_match(
-            g.get_node(adoc.node_id, NodeHandle),
+            g.get_node(adoc.node_id),
             hamcrest.all_of(
-                hamcrest.instance_of(NodeHandle),
-                hamcrest.has_property("attrs", adoc),
+                hamcrest.instance_of(ExternalTensor),
+                hamcrest.has_property("name", "A"),
             ),
         )
 
         # string lookup
         eggs.assert_match(
-            g.get_node(str(adoc.node_id), NodeHandle),
+            g.get_node(str(adoc.node_id)),
             hamcrest.all_of(
-                hamcrest.instance_of(NodeHandle),
-                hamcrest.has_property("attrs", adoc),
+                hamcrest.instance_of(ExternalTensor),
+                hamcrest.has_property("name", "A"),
             ),
         )
 
         eggs.assert_match(
-            g.get_node(adoc.node_id, ExternalTensorValue.Handle),
+            g.get_node(adoc.node_id, ExternalTensor),
             hamcrest.all_of(
-                hamcrest.instance_of(ExternalTensorValue.Handle),
-                hamcrest.has_property("attrs", adoc),
+                hamcrest.instance_of(ExternalTensor),
+                hamcrest.has_property("name", "A"),
             ),
         )
 
         eggs.assert_raises(
-            lambda: g.get_node(adoc.node_id, DisjointNodeHandle),
+            lambda: g.get_node(adoc.node_id, DisjointAttributes),
             ValueError,
         )
         eggs.assert_raises(
-            lambda: g.get_node(uuid.uuid4(), NodeHandle),
+            lambda: g.get_node(uuid.uuid4()),
             KeyError,
         )
 
-
-class GraphDocTest(unittest.TestCase):
     def test_schema(self) -> None:
-        g = GraphDoc()
-        a = ExternalTensorValue(
+        g = TapestryGraph()
+        a = ExternalTensor(
             node_id=uuid.uuid4(),
-            display_name="A",
+            name="A",
             shape=np.array([2, 3]),
             dtype="torch.int64",
             storage="pre:A",
@@ -307,38 +181,37 @@ class GraphDocTest(unittest.TestCase):
 
         b = TensorValue(
             node_id=uuid.uuid4(),
-            display_name="B",
+            name="B",
             shape=np.array([2, 3]),
             dtype="torch.int64",
         )
         g.add_node(b)
 
-        edge_node = EdgeAttributes(
+        edge_node = TapestryEdge(
             node_id=uuid.uuid4(),
-            display_name="child",
+            name="child",
             source_node_id=a.node_id,
             target_node_id=b.node_id,
         )
         g.add_node(edge_node)
 
-        s = GraphDoc.build_load_schema(
+        s = TapestryGraph.build_load_schema(
             [
-                EdgeAttributes,
-                TensorSource,
+                TapestryEdge,
                 TensorValue,
-                ExternalTensorValue,
+                ExternalTensor,
             ]
         )
 
         expected_json = {
             "nodes": {
                 str(a.node_id): {
-                    "__type__": "ExternalTensorValue",
+                    "__type__": "ExternalTensor",
                     **a.dump_json_data(),
                     "__edges__": [
                         {
                             **edge_node.dump_json_data(),
-                            "__type__": "EdgeAttributes",
+                            "__type__": "TapestryEdge",
                         }
                     ],
                 },
@@ -364,10 +237,10 @@ class GraphDocTest(unittest.TestCase):
         )
 
     def test_assert_node_types(self) -> None:
-        g = GraphDoc()
-        a = ExternalTensorValue(
+        g = TapestryGraph()
+        a = ExternalTensor(
             node_id=uuid.uuid4(),
-            display_name="A",
+            name="A",
             shape=np.array([2, 3]),
             dtype="torch.int64",
             storage="pre:A",
@@ -376,7 +249,7 @@ class GraphDocTest(unittest.TestCase):
 
         b = TensorValue(
             node_id=uuid.uuid4(),
-            display_name="B",
+            name="B",
             shape=np.array([2, 3]),
             dtype="torch.int64",
         )
@@ -384,7 +257,7 @@ class GraphDocTest(unittest.TestCase):
 
         g.assert_node_types(
             [
-                ExternalTensorValue,
+                ExternalTensor,
                 TensorValue,
             ]
         )
@@ -392,51 +265,51 @@ class GraphDocTest(unittest.TestCase):
         eggs.assert_raises(
             lambda: g.assert_node_types(
                 [
-                    TensorValue,
+                    TensorResult,
                 ],
             ),
             ValueError,
-            r"\[ExternalTensorValue\]",
+            r"\[ExternalTensor, TensorValue\]",
         )
 
     def test_edges(self) -> None:
-        g = GraphDoc()
+        g = TapestryGraph()
 
-        foo_node = NodeAttributes(
+        foo_node = TapestryNode(
             node_id=uuid.uuid4(),
-            display_name="foo",
+            name="foo",
         )
         g.add_node(foo_node)
 
-        edge_node = EdgeAttributes(
+        edge_node = TapestryEdge(
             node_id=uuid.uuid4(),
-            display_name="bar",
+            name="bar",
             source_node_id=foo_node.node_id,
             target_node_id=foo_node.node_id,
         )
         g.add_node(edge_node)
 
-        illegal_source = EdgeAttributes(
+        illegal_source = TapestryEdge(
             node_id=uuid.uuid4(),
-            display_name="illegal",
+            name="illegal",
             source_node_id=edge_node.node_id,
             target_node_id=foo_node.node_id,
         )
-        missing_source = EdgeAttributes(
+        missing_source = TapestryEdge(
             node_id=uuid.uuid4(),
-            display_name="illegal",
+            name="illegal",
             source_node_id=uuid.uuid4(),
             target_node_id=foo_node.node_id,
         )
-        illegal_target = EdgeAttributes(
+        illegal_target = TapestryEdge(
             node_id=uuid.uuid4(),
-            display_name="illegal",
+            name="illegal",
             source_node_id=foo_node.node_id,
             target_node_id=edge_node.node_id,
         )
-        missing_target = EdgeAttributes(
+        missing_target = TapestryEdge(
             node_id=uuid.uuid4(),
-            display_name="illegal",
+            name="illegal",
             source_node_id=foo_node.node_id,
             target_node_id=uuid.uuid4(),
         )

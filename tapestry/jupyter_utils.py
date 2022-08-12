@@ -1,8 +1,8 @@
-import pydot
 from IPython.core.display import Image
 from IPython.core.display_functions import display
+import pydot
 
-from tapestry.expression_graph import GraphDoc, GraphHandle
+from tapestry.expression_graph import TapestryGraph
 
 
 def display_pydot(pdot: pydot.Dot):
@@ -10,9 +10,5 @@ def display_pydot(pdot: pydot.Dot):
     display(plt)
 
 
-def display_graph_doc(graph_doc: GraphDoc):
+def display_graph_doc(graph_doc: TapestryGraph):
     display_pydot(graph_doc.to_dot())
-
-
-def display_graph_handle(graph_handle: GraphHandle):
-    display_graph_doc(graph_handle.doc)

@@ -1,5 +1,5 @@
-import uuid
 from typing import Any, Mapping, Optional, Union
+import uuid
 
 UUIDConvertable = Union[str, uuid.UUID]
 
@@ -29,6 +29,19 @@ def coerce_uuid(val: UUIDConvertable) -> uuid.UUID:
     raise ValueError(
         f"Unable to coerce to UUID: {type(val)}:: {val}",
     )
+
+
+def coerce_optional_uuid(val: Optional[UUIDConvertable]) -> Optional[uuid.UUID]:
+    """
+    Coerce an optional value to a uuid.UUID, or None.
+
+    :param val: the value.
+    :return: a uuid.UUID, or None.
+    :raises ValueError: if the value is not coercible.
+    """
+    if val is None:
+        return None
+    return coerce_uuid(val)
 
 
 def ensure_uuid(val: Optional[UUIDConvertable] = None) -> uuid.UUID:

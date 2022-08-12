@@ -1,9 +1,20 @@
 import copy
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 import html
-import typing
-from typing import Dict, Iterable, List, Optional, Type, TypeVar, Union, cast
+from typing import (
+    Any,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Type,
+    TypeVar,
+    Union,
+    cast,
+    overload,
+)
 import uuid
+import weakref
 
 import marshmallow
 from marshmallow import fields
@@ -14,231 +25,112 @@ import pydot
 
 from tapestry import zspace
 from tapestry.serialization.json_serializable import JsonDumpable, JsonLoadable
-from tapestry.type_utils import UUIDConvertable, coerce_uuid, dict_to_parameter_str
+from tapestry.type_utils import UUIDConvertable, coerce_optional_uuid, coerce_uuid
 
 NODE_TYPE_FIELD = "__type__"
 EDGES_FIELD = "__edges__"
 
 
+_TapestryNodeT = TypeVar("_TapestryNodeT", bound="TapestryNode")
+_TapestryEdgeT = TypeVar("_TapestryEdgeT", bound="TapestryEdge")
+
+
 @marshmallow_dataclass.add_schema
 @dataclass(kw_only=True)
-class NodeAttributes(JsonLoadable):
+class TapestryNode(JsonLoadable):
+    class Meta:
+        exclude = ("_graph",)
+
+    _graph: Any = None
+
     node_id: uuid.UUID = field(default_factory=uuid.uuid4)
     """Unique in a document."""
 
-    display_name: Optional[str] = None
-    """May be repeated in a document."""
+    name: Optional[str] = None
+
+    def clone(self: _TapestryNodeT) -> _TapestryNodeT:
+        val = copy.deepcopy(self)
+        del val.graph
+        return val
 
     @classmethod
     def node_type(cls) -> str:
-        return cls.__name__
+        return cls.__qualname__
+
+    def assert_graph(self) -> "TapestryGraph":
+        g = self.graph
+        if g is None:
+            raise ValueError("No attached graph")
+        return g
+
+    @property
+    def graph(self) -> Optional["TapestryGraph"]:
+        """
+        :return: the GraphDoc.
+        :raises ValueError: if the object is not attached to a GraphDoc.
+        :raises ReferenceError: if the attached GraphDoc is out of scope.
+        """
+        if self._graph is None:
+            return None
+        try:
+            return cast(TapestryGraph, self._graph())
+        except ReferenceError:
+            return None
+
+    @graph.setter
+    def graph(self, graph: "TapestryGraph") -> None:
+        self._graph = weakref.ref(graph)
+
+    @graph.deleter
+    def graph(self) -> None:
+        self._graph = None
 
 
 @marshmallow_dataclass.add_schema
 @dataclass(kw_only=True)
-class EdgeAttributes(NodeAttributes):
+class TapestryEdge(TapestryNode):
     source_node_id: uuid.UUID
     target_node_id: uuid.UUID
 
+    @overload
+    def source(self) -> TapestryNode:
+        ...
 
-NodeAttributesT = TypeVar("NodeAttributesT", bound="NodeAttributes")
-NodeHandleT = TypeVar("NodeHandleT", bound="NodeHandle")
+    @overload
+    def source(self, node_type: Type[_TapestryNodeT]) -> _TapestryNodeT:
+        ...
 
+    def source(
+        self, node_type: Type[TapestryNode | _TapestryNodeT] = TapestryNode
+    ) -> Union[TapestryNode, _TapestryNodeT]:
+        return self.assert_graph().get_node(self.source_node_id, node_type)
 
-# See forward references:
-#  * TypeVar NodeHandleT
-class NodeHandle:
-    """
-    Base class for node handles of NodeAttributes.
+    @overload
+    def target(self) -> TapestryNode:
+        ...
 
-    Provides reference to the containing `.graph`, and the embedded `.attrs`.
+    @overload
+    def target(self, node_type: Type[_TapestryNodeT]) -> _TapestryNodeT:
+        ...
 
-    Equality and hashing is via node_id.
-    """
-
-    graph: "GraphHandle"
-    """
-    The attached GraphHandle.
-    
-    As wrapping nodes are transient, and the GraphHandle has no reference to them,
-    only the underlying NodeAttrsDocs (which are not recursive); this does not
-    need to be a weakref.
-    """
-
-    attrs: NodeAttributes
-    """
-    The wrapped NodeAttributes.
-    
-    The type of this annotation is used to determine if a subclass is permitted
-    to wrap documents. Subclasses which wrap specialized NodeAttributes subclasses
-    should declare a more restrictive type for `.attrs`.
-    
-    This means that typed handles subclasses have typed attrs.
-    """
-
-    def __init__(
-        self,
-        *,
-        graph: "GraphHandle",
-        attrs: NodeAttributes,
-    ):
-        self.graph = graph
-
-        self.assert_wraps_doc_type(type(attrs))
-        self.attrs = attrs
-
-    def __eq__(self, other):
-        if not isinstance(other, NodeHandle):
-            return False
-
-        return self.node_id == other.attrs.node_id
-
-    def __hash__(self) -> int:
-        return hash(self.node_id)
-
-    @classmethod
-    def wraps_doc_type(
-        cls,
-        doc_type: Union[NodeAttributes, Type[NodeAttributes]],
-    ) -> bool:
-        """
-        Will this NodeHandle subclass wrap the given NodeAttributes subclass?
-
-        :param doc_type: the NodeAttributes type to test.
-        :return: True if compatible.
-        """
-        if isinstance(doc_type, NodeAttributes):
-            doc_type = type(doc_type)
-
-        attrs_type = typing.get_type_hints(cls)["attrs"]
-
-        return issubclass(doc_type, attrs_type)
-
-    @classmethod
-    def assert_wraps_doc_type(
-        cls,
-        doc_type: Union[NodeAttributes, Type[NodeAttributes]],
-    ) -> None:
-        """
-        Assert that this NodeHandle subclass will wrap the given NodeAttributes subclass.
-
-        :param doc_type: the NodeAttributes type to test.
-        :raises ValueError: on type incompatibility.
-        :raises AssertionError: if doc_type is not a NodeAttributes.
-        """
-        if isinstance(doc_type, NodeAttributes):
-            doc_type = type(doc_type)
-
-        if not issubclass(doc_type, NodeAttributes):
-            raise AssertionError(
-                f"{doc_type.__name__} is not a subclass of NodeAttributes",
-            )
-
-        if not cls.wraps_doc_type(doc_type):
-            raise ValueError(f"{cls.__name__} cannot wrap {doc_type.__name__}")
-
-    @property
-    def node_id(self) -> uuid.UUID:
-        """
-        The node node_id.
-        """
-        return self.attrs.node_id
-
-    @property
-    def doc_type(self) -> Type[NodeAttributes]:
-        """
-        The type of the attrs.
-        """
-        return type(self.attrs)
-
-    def __repr__(self):
-        return (
-            f"{type(self).__name__}[{self.doc_type.__name__}]"
-            f"({dict_to_parameter_str(asdict(self.attrs))})"
-        )
-
-    def __str__(self):
-        return repr(self)
-
-    def force_as_type(self, handle_type: Type[NodeHandleT]) -> NodeHandleT:
-        """
-        Construct a new wrapper for `.attrs` of the given type, or throw.
-
-        :param handle_type: the target wrapper type.
-        :return: the new wrapper.
-        :raises ValueError: if the type cannot wrap `.attrs`.
-        """
-        return handle_type(
-            graph=self.graph,
-            attrs=self.attrs,
-        )
-
-    def try_as_type(self, handle_type: Type[NodeHandleT]) -> Optional[NodeHandleT]:
-        """
-        Try to construct a new wrapper for `.attrs`, or return None.
-
-        The assignment operator (:=) permits simple typed flow dispatch:
-
-        >>> node: XyzzyWrapper
-        >>> if foo := node.try_as_type(FooWrapper):
-        >>>    do_foo_thing(foo.attrs.foo_attr)
-        >>> elif bar := node.try_as_type(BarWrapper):
-        >>>    do_bar_thing(bar.attrs.bar_attr)
-        >>> else:
-        >>>    do_xyzzy_thing(node)
-
-        :param handle_type: the target wrapper type.
-        :return: the new wrapper, or None.
-        """
-        if not handle_type.wraps_doc_type(self.attrs):
-            return None
-
-        return handle_type(
-            graph=self.graph,
-            attrs=self.attrs,
-        )
-
-
-class EdgeHandle(NodeHandle):
-    attrs: EdgeAttributes
-
-    def __init__(
-        self,
-        *,
-        graph: "GraphHandle",
-        attrs: EdgeAttributes,
-    ):
-        assert isinstance(attrs, EdgeAttributes), type(attrs)
-        super().__init__(
-            graph=graph,
-            attrs=attrs,
-        )
-
-    def source(self) -> NodeHandle:
-        return self.graph.get_node(self.attrs.source_node_id, NodeHandle)
-
-    def source_as(self, handle_type: Type[NodeHandleT]) -> NodeHandleT:
-        return self.graph.get_node(self.attrs.source_node_id, handle_type)
-
-    def target(self) -> NodeHandle:
-        return self.graph.get_node(self.attrs.target_node_id, NodeHandle)
-
-    def target_as(self, handle_type: Type[NodeHandleT]) -> NodeHandleT:
-        return self.graph.get_node(self.attrs.target_node_id, handle_type)
+    def target(
+        self, node_type: Type[TapestryNode | _TapestryNodeT] = TapestryNode
+    ) -> Union[TapestryNode, _TapestryNodeT]:
+        return self.assert_graph().get_node(self.target_node_id, node_type)
 
 
 @dataclass
-class GraphDoc(JsonDumpable):
+class TapestryGraph(JsonDumpable):
     """
     Serializable NodeAttributes graph.
     """
 
-    nodes: Dict[uuid.UUID, NodeAttributes]
+    nodes: Dict[uuid.UUID, TapestryNode]
 
     @classmethod
     def build_load_schema(
         cls,
-        node_types: Iterable[Type[NodeAttributes]],
+        node_types: Iterable[Type[TapestryNode]],
     ) -> marshmallow.Schema:
         """
         Builds a load schema for a collection of node types.
@@ -255,9 +147,12 @@ class GraphDoc(JsonDumpable):
             type_field = NODE_TYPE_FIELD
 
             type_schemas = {
-                cls.__name__: cast(Type[NodeAttributes], cls).get_load_schema()
+                cls.__qualname__: cast(Type[TapestryNode], cls).get_load_schema()
                 for cls in node_types
             }
+
+            def get_obj_type(self, obj):
+                return type(obj).__qualname__
 
         class G(marshmallow.Schema):
             nodes = fields.Dict(
@@ -300,7 +195,10 @@ class GraphDoc(JsonDumpable):
 
             @marshmallow.post_load
             def post_load(self, data, **kwargs):
-                return GraphDoc(**data)
+                graph = TapestryGraph(**data)
+                for node in graph.nodes.values():
+                    node.graph = graph
+                return graph
 
         return G()
 
@@ -313,14 +211,150 @@ class GraphDoc(JsonDumpable):
     def __init__(
         self,
         *,
-        nodes: Optional[Dict[uuid.UUID, NodeAttributes]] = None,
+        nodes: Optional[Dict[uuid.UUID, TapestryNode]] = None,
     ):
         self.nodes = {}
         if nodes is not None:
             for n in nodes.values():
                 self.add_node(n)
 
-    def add_node(self, node: NodeAttributesT) -> NodeAttributesT:
+    def clone(self) -> "TapestryGraph":
+        """
+        Deep clone of a graph.
+
+        :return: a new graph.
+        """
+        g = TapestryGraph()
+        for node in self.nodes.values():
+            g.add_node(node.clone())
+        return g
+
+    @overload
+    def get_node(
+        self,
+        node_id: UUIDConvertable,
+    ) -> TapestryNode:
+        ...
+
+    @overload
+    def get_node(
+        self,
+        node_id: UUIDConvertable,
+        node_type: Type[_TapestryNodeT],
+    ) -> _TapestryNodeT:
+        ...
+
+    def get_node(
+        self,
+        node_id: UUIDConvertable,
+        node_type: Type[TapestryNode] = TapestryNode,
+    ) -> _TapestryNodeT:
+        """
+        Find a NodeAttributes by node_id, and wrap it in the given node type.
+
+        :param node_id: the node_id, may be str or UUID.
+        :param node_type: the expected type.
+        :return: the wrapped node.
+        """
+        node_id = coerce_uuid(node_id)
+
+        if not issubclass(node_type, TapestryNode):
+            raise AssertionError(
+                f"{node_type} is not a subclass of {TapestryNode}",
+            )
+
+        node = self.nodes[node_id]
+        if not isinstance(node, node_type):
+            raise ValueError(
+                f"Node {node.node_id} is not of the expected type {node_type}:\n{node.pretty()}"
+            )
+        return cast(_TapestryNodeT, node)
+
+    def remove_node(self, node: UUIDConvertable | TapestryNode) -> None:
+        """
+        Remove a node from the graph.
+
+        :param node: the node to remove.
+        :raises KeyError: if the node is not in the graph.
+        """
+        if not isinstance(node, TapestryNode):
+            node = self.get_node(coerce_uuid(node))
+
+        if node.node_id not in self.nodes:
+            raise KeyError(f"Node {node.node_id} not in graph:\n{node.pretty()}")
+
+        del node.graph
+        del self.nodes[node.node_id]
+
+    @overload
+    def list_nodes(self) -> List[TapestryNode]:
+        ...
+
+    @overload
+    def list_nodes(self, node_type: Type[_TapestryNodeT]) -> List[_TapestryNodeT]:
+        ...
+
+    def list_nodes(
+        self,
+        node_type: Type[TapestryNode | _TapestryNodeT] = TapestryNode,
+    ) -> Union[List[TapestryNode], List[_TapestryNodeT]]:
+        """
+        List all nodes which are subclasses of the given type.
+
+        :param node_type: the node wrapper type.
+        :return: a list of nodes.
+        """
+        if not issubclass(node_type, TapestryNode):
+            raise AssertionError(
+                f"Class {node_type} is not a subclass of {TapestryNode}"
+            )
+        return [
+            cast(_TapestryNodeT, node)
+            for node in self.nodes.values()
+            if isinstance(node, node_type)
+        ]
+
+    @overload
+    def list_edges(
+        self,
+        *,
+        source_id: UUIDConvertable = None,
+        target_id: UUIDConvertable = None,
+    ) -> List[TapestryEdge]:
+        ...
+
+    @overload
+    def list_edges(
+        self,
+        edge_type: Type[_TapestryEdgeT],
+        *,
+        source_id: UUIDConvertable = None,
+        target_id: UUIDConvertable = None,
+    ) -> List[_TapestryEdgeT]:
+        ...
+
+    def list_edges(
+        self,
+        edge_type: Type[TapestryEdge | _TapestryEdgeT] = TapestryEdge,
+        *,
+        source_id: UUIDConvertable = None,
+        target_id: UUIDConvertable = None,
+    ) -> Union[List[TapestryEdge], List[_TapestryEdgeT]]:
+        if not issubclass(edge_type, TapestryEdge):
+            raise AssertionError(
+                f"Class {edge_type} is not a subclass of {TapestryEdge}"
+            )
+
+        source_id = coerce_optional_uuid(source_id)
+        target_id = coerce_optional_uuid(target_id)
+        return [
+            node
+            for node in self.list_nodes(edge_type)
+            if source_id is None or node.source_node_id == source_id
+            if target_id is None or node.target_node_id == target_id
+        ]
+
+    def add_node(self, node: _TapestryNodeT) -> _TapestryNodeT:
         """
         Add a node to the document.
 
@@ -332,7 +366,7 @@ class GraphDoc(JsonDumpable):
         if node.node_id in self.nodes:
             raise ValueError(f"Node {node.node_id} already in graph.")
 
-        if isinstance(node, EdgeAttributes):
+        if isinstance(node, TapestryEdge):
             for port in ("source_node_id", "target_node_id"):
                 port_id = getattr(node, port)
                 if port_id not in self.nodes:
@@ -341,19 +375,20 @@ class GraphDoc(JsonDumpable):
                     )
 
                 port_node = self.nodes[port_id]
-                if isinstance(port_node, EdgeAttributes):
+                if isinstance(port_node, TapestryEdge):
                     raise ValueError(
                         f"Edge {port}({port_id}) is an edge:\n\n{repr(node)}"
                         f"\n\n ==[{port}]==>\n\n{repr(port_node)}",
                     )
 
         self.nodes[node.node_id] = node
+        node.graph = self
 
         return node
 
     def assert_node_types(
         self,
-        node_types: Iterable[Type[NodeAttributes]],
+        node_types: Iterable[Type[TapestryNode]],
     ) -> None:
         """
         Assert that the GraphDoc contains only the listed types.
@@ -390,10 +425,10 @@ class GraphDoc(JsonDumpable):
         dot.set_graph_defaults(bgcolor="white")
         dot.set_graph_defaults(rankdir="RL")
         for node in self.nodes.values():
-            node_type = type(node).__name__
+            node_type = type(node).node_type()
 
             data = node.dump_json_data()
-            is_edge = isinstance(node, EdgeAttributes)
+            is_edge = isinstance(node, TapestryEdge)
 
             if omit_ids:
                 del data["node_id"]
@@ -429,7 +464,7 @@ class GraphDoc(JsonDumpable):
             )
 
         for node in self.nodes.values():
-            if isinstance(node, EdgeAttributes):
+            if isinstance(node, TapestryEdge):
                 dot.add_edge(
                     pydot.Edge(
                         str(node.source_node_id),
@@ -447,74 +482,9 @@ class GraphDoc(JsonDumpable):
         return dot
 
 
-class GraphHandle:
-    doc: GraphDoc
-
-    def __init__(
-        self,
-        doc: Optional[GraphDoc] = None,
-    ):
-        if doc is None:
-            doc = GraphDoc()
-        self.doc = doc
-
-    def __repr__(self):
-        return f"{type(self).__name__}(doc={repr(self.doc)})"
-
-    def __str__(self):
-        return str(self.doc.pretty())
-
-    def all_handles_of_type(self, handle_type: Type[NodeHandleT]) -> List[NodeHandleT]:
-        """
-        List all nodes wrappable by the given wrapper type.
-
-        :param handle_type: the node wrapper type.
-        :return: a list of nodes.
-        """
-        if not issubclass(handle_type, NodeHandle):
-            raise AssertionError(
-                f"Class {handle_type} is not a subclass of {NodeHandle}"
-            )
-        return [
-            handle_type(
-                graph=self,
-                attrs=node_doc,
-            )
-            for node_doc in self.doc.nodes.values()
-            if handle_type.wraps_doc_type(type(node_doc))
-        ]
-
-    def get_node(
-        self,
-        node_id: UUIDConvertable,
-        handle_type: Type[NodeHandleT],
-    ) -> NodeHandleT:
-        """
-        Find a NodeAttributes by node_id, and wrap it in the given node type.
-
-        :param node_id: the node_id, may be str or UUID.
-        :param handle_type: the wrapper type.
-        :return: the wrapped node.
-        """
-        node_id = coerce_uuid(node_id)
-
-        if not issubclass(handle_type, NodeHandle):
-            raise AssertionError(
-                f"{handle_type} is not a subclass of {NodeHandle}",
-            )
-
-        return handle_type(
-            graph=self,
-            attrs=self.doc.nodes[node_id],
-        )
-
-
 @marshmallow_dataclass.add_schema
 @dataclass(kw_only=True)
-class TensorSource(NodeAttributes):
-    class Handle(NodeHandle):
-        attrs: "TensorSource"
-
+class TensorValue(TapestryNode):
     shape: zspace.ZArray
     dtype: str
 
@@ -524,49 +494,49 @@ class TensorSource(NodeAttributes):
 
 @marshmallow_dataclass.add_schema
 @dataclass(kw_only=True)
-class TensorValue(TensorSource):
-    class Handle(TensorSource.Handle):
-        attrs: "TensorValue"
-
-
-@marshmallow_dataclass.add_schema
-@dataclass(kw_only=True)
 class TensorResult(TensorValue):
-    class Handle(TensorSource.Handle):
-        attrs: "TensorResult"
+    pass
 
 
 @marshmallow_dataclass.add_schema
 @dataclass(kw_only=True)
-class ExternalTensorValue(TensorValue):
-    class Handle(TensorValue.Handle):
-        attrs: "ExternalTensorValue"
-
+class ExternalTensor(TensorValue):
     storage: str
 
 
 @marshmallow_dataclass.add_schema
 @dataclass(kw_only=True)
-class BlockOperation(NodeAttributes):
-    class Handle(NodeHandle):
-        attrs: "BlockOperation"
-
+class BlockOperation(TapestryNode):
     index_space: zspace.ZRange
 
     @marshmallow_dataclass.add_schema
     @dataclass(kw_only=True)
-    class BindTensor(EdgeAttributes):
-        class Handle(EdgeHandle):
-            attrs: "BlockOperation.BindTensor"
-
+    class TensorBinding(TapestryEdge):
+        # force name to be required
+        name: str
         selector: zspace.ZRangeMap
 
+        def __post_init__(self):
+            assert self.name
+
     @marshmallow_dataclass.add_schema
     @dataclass(kw_only=True)
-    class BlockInput(BindTensor):
+    class Input(TensorBinding):
         pass
 
     @marshmallow_dataclass.add_schema
     @dataclass(kw_only=True)
-    class BlockOutput(BindTensor):
+    class Result(TensorBinding):
         pass
+
+    def inputs(self) -> List[Input]:
+        return self.assert_graph().list_edges(
+            edge_type=BlockOperation.Input,
+            source_id=self.node_id,
+        )
+
+    def results(self) -> List[Result]:
+        return self.assert_graph().list_edges(
+            edge_type=BlockOperation.Result,
+            target_id=self.node_id,
+        )

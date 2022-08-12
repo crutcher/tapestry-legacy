@@ -170,7 +170,7 @@ class ZRangeTest(unittest.TestCase):
 class ZAffineMapTest(unittest.TestCase):
     def test_identity(self):
         eggs.assert_match(
-            ZTransform.identity(2),
+            ZTransform.identity_transform(2),
             hamcrest.has_properties(
                 projection=np_eggs.matches_ndarray([[1, 0], [0, 1]]),
                 offset=np_eggs.matches_ndarray([0, 0]),
@@ -178,7 +178,7 @@ class ZAffineMapTest(unittest.TestCase):
         )
 
         eggs.assert_match(
-            ZTransform.identity(2, [-1, 2]),
+            ZTransform.identity_transform(2, [-1, 2]),
             hamcrest.has_properties(
                 projection=np_eggs.matches_ndarray([[1, 0], [0, 1]]),
                 offset=np_eggs.matches_ndarray([-1, 2]),
@@ -256,18 +256,18 @@ class ZAffineMapTest(unittest.TestCase):
             hamcrest.has_properties(
                 in_dim=2,
                 out_dim=3,
-                constant=False,
+                is_constant=False,
             ),
         )
 
-    def test_constant(self):
+    def test_is_constant(self):
         eggs.assert_match(
             ZTransform(
                 projection=[[0, 0], [0, 0]],
                 offset=[-5, 0],
             ),
             hamcrest.has_properties(
-                constant=True,
+                is_constant=True,
             ),
         )
 
@@ -289,7 +289,7 @@ class ZAffineMapTest(unittest.TestCase):
 class ZRangeMapTest(unittest.TestCase):
     def test_identity(self):
         eggs.assert_match(
-            ZRangeMap.identity([2, 3]),
+            ZRangeMap.identity_map([2, 3]),
             hamcrest.has_properties(
                 transform=hamcrest.has_properties(
                     projection=np_eggs.matches_ndarray([[1, 0], [0, 1]]),
@@ -300,7 +300,7 @@ class ZRangeMapTest(unittest.TestCase):
         )
 
         eggs.assert_match(
-            ZRangeMap.identity([2, 3], offset=[-1, 2]),
+            ZRangeMap.identity_map([2, 3], offset=[-1, 2]),
             hamcrest.has_properties(
                 transform=hamcrest.has_properties(
                     projection=np_eggs.matches_ndarray([[1, 0], [0, 1]]),
