@@ -1,8 +1,8 @@
 import unittest
 
 import hamcrest
-import numpy as np
 from marshmallow_dataclass import dataclass
+import numpy as np
 
 from tapestry.serialization.json_serializable import JsonLoadable
 from tapestry.serialization.json_testlib import assert_json_serializable_roundtrip
@@ -168,6 +168,23 @@ class ZRangeTest(unittest.TestCase):
 
 
 class ZAffineMapTest(unittest.TestCase):
+    def test_identity(self):
+        eggs.assert_match(
+            ZTransform.identity(2),
+            hamcrest.has_properties(
+                projection=np_eggs.matches_ndarray([[1, 0], [0, 1]]),
+                offset=np_eggs.matches_ndarray([0, 0]),
+            ),
+        )
+
+        eggs.assert_match(
+            ZTransform.identity(2, [-1, 2]),
+            hamcrest.has_properties(
+                projection=np_eggs.matches_ndarray([[1, 0], [0, 1]]),
+                offset=np_eggs.matches_ndarray([-1, 2]),
+            ),
+        )
+
     def test_construction(self):
         eggs.assert_match(
             ZTransform(
@@ -270,6 +287,29 @@ class ZAffineMapTest(unittest.TestCase):
 
 
 class ZRangeMapTest(unittest.TestCase):
+    def test_identity(self):
+        eggs.assert_match(
+            ZRangeMap.identity([2, 3]),
+            hamcrest.has_properties(
+                transform=hamcrest.has_properties(
+                    projection=np_eggs.matches_ndarray([[1, 0], [0, 1]]),
+                    offset=np_eggs.matches_ndarray([0, 0]),
+                ),
+                shape=np_eggs.matches_ndarray([2, 3]),
+            ),
+        )
+
+        eggs.assert_match(
+            ZRangeMap.identity([2, 3], offset=[-1, 2]),
+            hamcrest.has_properties(
+                transform=hamcrest.has_properties(
+                    projection=np_eggs.matches_ndarray([[1, 0], [0, 1]]),
+                    offset=np_eggs.matches_ndarray([-1, 2]),
+                ),
+                shape=np_eggs.matches_ndarray([2, 3]),
+            ),
+        )
+
     def test_construction(self):
         eggs.assert_match(
             ZRangeMap(

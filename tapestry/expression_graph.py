@@ -1,16 +1,16 @@
 import copy
+from dataclasses import asdict, dataclass, field
 import html
 import typing
-import uuid
-from dataclasses import asdict, dataclass, field
 from typing import Dict, Iterable, List, Optional, Type, TypeVar, Union, cast
+import uuid
 
 import marshmallow
-import marshmallow_dataclass
-import pydot
 from marshmallow import fields
+import marshmallow_dataclass
 from marshmallow_oneofschema import OneOfSchema
 from overrides import overrides
+import pydot
 
 from tapestry import zspace
 from tapestry.serialization.json_serializable import JsonDumpable, JsonLoadable

@@ -1,9 +1,9 @@
 import functools
 from typing import Iterable, List
 
-import numpy as np
 from marshmallow import fields
 from marshmallow_dataclass import NewType, dataclass
+import numpy as np
 
 from tapestry.numpy_utils import as_zarray, ndarray_hash, ndarray_lt
 from tapestry.serialization.frozendoc import FrozenDoc
@@ -176,6 +176,23 @@ class ZTransform(FrozenDoc):
     offset: ZArray
     """The offset vector."""
 
+    @classmethod
+    def identity(cls, n_dim: int, offset=None):
+        """
+        Construct an identity transform in the given dimensions.
+
+        :param n_dim: number of dimensions.
+        :param offset: (optional) offset, defaults to [0, ...].
+        :return: a new ZTransform.
+        """
+        if offset is None:
+            offset = np.zeros(n_dim, dtype=int)
+
+        return ZTransform(
+            projection=np.identity(n_dim, dtype=int),
+            offset=offset,
+        )
+
     def __init__(self, projection, offset):
         with self._thaw_context():
             self.projection = as_zarray(
@@ -239,6 +256,16 @@ class ZRangeMap(FrozenDoc):
 
     transform: ZTransform
     shape: ZArray
+
+    @classmethod
+    def identity(cls, shape=None, *, offset=None):
+        return ZRangeMap(
+            transform=ZTransform.identity(
+                n_dim=len(shape),
+                offset=offset,
+            ),
+            shape=shape,
+        )
 
     def __init__(self, transform: ZTransform, shape: Iterable[int]):
         with self._thaw_context():
