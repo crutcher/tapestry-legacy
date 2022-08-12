@@ -127,14 +127,14 @@ class ZRange(FrozenDoc):
         return self.shape.prod()
 
     @functools.cached_property
-    def empty(self) -> bool:
+    def is_empty(self) -> bool:
         "Is the range empty?"
         return self.size == 0
 
     @functools.cached_property
-    def nonempty(self) -> bool:
+    def is_nonempty(self) -> bool:
         "Is the range non-empty?"
-        return not self.empty
+        return not self.is_empty
 
     @functools.cached_property
     def inclusive_corners(self) -> List[np.ndarray]:
@@ -144,7 +144,7 @@ class ZRange(FrozenDoc):
         * Duplicate corners will be included once,
         * Empty ranges will return []
         """
-        if self.empty:
+        if self.is_empty:
             return []
 
         ndim = self.ndim
@@ -221,13 +221,17 @@ class ZTransform(FrozenDoc):
             offset=offset,
         )
 
-    def __init__(self, projection, offset):
+    def __init__(self, projection, offset = None):
         with self._thaw_context():
             self.projection = as_zarray(
                 projection,
                 ndim=2,
                 immutable=True,
             )
+
+            if offset is None:
+                offset = np.zeros(self.projection.shape[1])
+
             self.offset = as_zarray(
                 offset,
                 ndim=1,
@@ -392,7 +396,7 @@ class ZRangeMap(FrozenDoc):
                 f"ZRange ndim ({zrange.ndim}) != ZRangeMap in_dim ({self.in_dim})"
             )
 
-        assert not zrange.empty
+        assert not zrange.is_empty
 
         # FIXME: this is dumb.
         #

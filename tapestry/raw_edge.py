@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 import numpy as np
 
 from tapestry.expression_graph import (
@@ -21,17 +23,11 @@ def f(
 
     y_shape = np.append(x.shape[:-1], w.shape[1])
 
-    y = graph.add_node(
-        TensorResult(
-            name="Y",
-            shape=y_shape,
-            dtype="torch.float16",
-        )
-    )
+    op_name = "Linear"
 
     op = graph.add_node(
         BlockOperation(
-            name="Linear",
+            name=op_name,
             index_space=ZRange(y_shape),
         )
     )
@@ -54,6 +50,14 @@ def f(
         )
     )
 
+    y = graph.add_node(
+        TensorResult(
+            name=f"{op_name}:Y",
+            shape=y_shape,
+            dtype="torch.float16",
+        )
+    )
+
     graph.add_node(
         BlockOperation.Result(
             source_id=y.node_id,
@@ -64,6 +68,7 @@ def f(
     )
 
     return y
+
 
 
 def raw():
@@ -90,8 +95,6 @@ def raw():
     y = f(x, w)
 
     g.validate()
-
-    print(g.pretty())
 
 
 if __name__ == "__main__":

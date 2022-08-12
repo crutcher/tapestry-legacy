@@ -18,6 +18,7 @@ import uuid
 import weakref
 
 import marshmallow
+import numpy as np
 from marshmallow import fields
 import marshmallow_dataclass
 from marshmallow_oneofschema import OneOfSchema
@@ -34,6 +35,22 @@ EDGES_FIELD = "__edges__"
 
 _TapestryNodeT = TypeVar("_TapestryNodeT", bound="TapestryNode")
 _TapestryEdgeT = TypeVar("_TapestryEdgeT", bound="TapestryEdge")
+
+NodeIdCoercible = Union[UUIDConvertable, "TapestryNode"]
+
+
+def coerce_node_id(val: NodeIdCoercible) -> uuid.UUID:
+    if isinstance(val, TapestryNode):
+        return val.node_id
+    return coerce_uuid(val)
+
+
+def coerce_optional_node_id(
+    val: Optional[NodeIdCoercible],
+) -> Optional[NodeIdCoercible]:
+    if val is None:
+        return None
+    return coerce_node_id(val)
 
 
 @marshmallow_dataclass.add_schema
@@ -385,7 +402,7 @@ class TapestryGraph(JsonDumpable):
         """
         Add a node to the document.
 
-        EdgeAttributes nodes are validated that their `.source_node_id` and `.target_node_id`
+        EdgeAttributes nodes are validated that their `.source_id` and `.target_id`
         appear in the graph, and are not edges.
 
         :param node: the node.
@@ -461,8 +478,8 @@ class TapestryGraph(JsonDumpable):
                 del data["node_id"]
 
                 if is_edge:
-                    del data["source_node_id"]
-                    del data["target_node_id"]
+                    del data["source_id"]
+                    del data["target_id"]
 
             null_keys = [k for k, v in data.items() if v is None]
             for k in null_keys:
@@ -536,7 +553,6 @@ class ExternalTensor(TensorValue):
 class BlockOperation(TapestryNode):
     index_space: zspace.ZRange
 
-    @marshmallow_dataclass.add_schema
     @dataclass(kw_only=True)
     class TensorBinding(TapestryEdge):
         # force name to be required
@@ -546,17 +562,40 @@ class BlockOperation(TapestryNode):
         def __post_init__(self):
             assert self.name
 
+        def _validate(self, op: "BlockOperation", tensor: TensorValue):
+            actual = np.array((op.index_space.ndim, tensor.shape.ndim))
+            if (actual == self.selector.shape).all():
+                raise AssertionError(
+                    f"Selector Dimension Miss-match:\n"
+                    f"{self.prety()}\n\n"
+                    f"Op {op.prety()}\n\n"
+                    f"Tensor {tensor.pretty()}"
+                )
+
     @marshmallow_dataclass.add_schema
     @dataclass(kw_only=True)
     class Input(TensorBinding):
         class Constraint(TapestryEdge.Constraint):
             SOURCE_TYPE: "BlockOperation"
+            TARGET_TYPE: TensorValue
+
+        def validate(self) -> None:
+            op = self.source(BlockOperation)
+            tensor = self.target(TensorValue)
+            self._validate(op, tensor)
 
     @marshmallow_dataclass.add_schema
     @dataclass(kw_only=True)
     class Result(TensorBinding):
         class Constraint(TapestryEdge.Constraint):
+            SOURCE_TYPE: TensorValue
             TARGET_TYPE: "BlockOperation"
+
+        def validate(self) -> None:
+            tensor = self.source(TensorResult)
+            op = self.target(BlockOperation)
+            self._validate(op, tensor)
+
 
     def inputs(self) -> List[Input]:
         return self.assert_graph().list_edges(

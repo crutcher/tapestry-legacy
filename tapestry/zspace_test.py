@@ -87,8 +87,8 @@ class ZRangeTest(unittest.TestCase):
 
     def test_empty(self) -> None:
         r = ZRange(start=[2, 3], end=[2, 3])
-        eggs.assert_true(r.empty)
-        eggs.assert_false(r.nonempty)
+        eggs.assert_true(r.is_empty)
+        eggs.assert_false(r.is_nonempty)
 
     def test_props(self) -> None:
         eggs.assert_match(
@@ -97,8 +97,8 @@ class ZRangeTest(unittest.TestCase):
                 ndim=2,
                 shape=np_eggs.matches_ndarray([1, 2]),
                 size=2,
-                empty=False,
-                nonempty=True,
+                is_empty=False,
+                is_nonempty=True,
             ),
         )
 

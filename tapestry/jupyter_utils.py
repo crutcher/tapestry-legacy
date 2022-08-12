@@ -10,5 +10,5 @@ def display_pydot(pdot: pydot.Dot):
     display(plt)
 
 
-def display_graph_doc(graph_doc: TapestryGraph):
+def display_graph(graph_doc: TapestryGraph):
     display_pydot(graph_doc.to_dot())
