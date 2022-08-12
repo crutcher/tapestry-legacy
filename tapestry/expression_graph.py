@@ -18,10 +18,10 @@ import uuid
 import weakref
 
 import marshmallow
-import numpy as np
 from marshmallow import fields
 import marshmallow_dataclass
 from marshmallow_oneofschema import OneOfSchema
+import numpy as np
 from overrides import overrides
 import pydot
 
@@ -567,8 +567,8 @@ class BlockOperation(TapestryNode):
             if (actual == self.selector.shape).all():
                 raise AssertionError(
                     f"Selector Dimension Miss-match:\n"
-                    f"{self.prety()}\n\n"
-                    f"Op {op.prety()}\n\n"
+                    f"{self.pretty()}\n\n"
+                    f"Op {op.pretty()}\n\n"
                     f"Tensor {tensor.pretty()}"
                 )
 
@@ -595,7 +595,6 @@ class BlockOperation(TapestryNode):
             tensor = self.source(TensorResult)
             op = self.target(BlockOperation)
             self._validate(op, tensor)
-
 
     def inputs(self) -> List[Input]:
         return self.assert_graph().list_edges(
