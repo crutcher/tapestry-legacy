@@ -1,6 +1,22 @@
 import numpy as np
 
 
+def ndarray_aggregate_equality(a, b):
+    """
+    Aggregate, non-throwing (a == b).
+
+    :param a: a numpy coercible array.
+    :param b: a numpy coercible array.
+    :return: True or False.
+    """
+    a = np.asarray(a)
+    b = np.asarray(b)
+    try:
+        return np.equal(a, b).all()
+    except np.ValueError:
+        return False
+
+
 def ndarray_hash(arr: np.ndarray) -> int:
     return hash(arr.tobytes())
 

@@ -1,100 +1,160 @@
-from dataclasses import dataclass
-
-import numpy as np
+from typing import Optional
 
 from tapestry.expression_graph import (
     BlockOperation,
-    ExternalTensor,
+    PinnedTensor,
     TapestryGraph,
     TensorResult,
     TensorValue,
 )
-from tapestry.zspace import ZRange, ZRangeMap
+from tapestry.zspace import ZRange, ZRangeMap, ZTransform, assert_shape
 
 
-def f(
+def _name_and_shape(val: TensorValue):
+    s = "Tensor"
+    if val.name:
+        s += f"[{val.name}]"
+    s += f"{val.shape}"
+    return s
+
+
+def linear_op(
+    *,
     x: TensorValue,
     w: TensorValue,
+    bias: Optional[TensorValue] = None,
 ) -> TensorResult:
     graph = x.assert_graph()
     assert w.graph == graph
 
-    assert x.shape[-1] == w.shape[0]
+    assert len(w.shape) == 2, w.shape
+    in_dim = w.shape[0]
+    out_dim = w.shape[1]
 
-    y_shape = np.append(x.shape[:-1], w.shape[1])
+    assert_shape(
+        x.shape[-1:],
+        w.shape[:1],
+        "input shape {xshape} in_dim {actual} incompatible "
+        "with weight shape {wshape} in_dim {expected}",
+        xshape=x.shape,
+        wshape=w.shape,
+    )
+
+    index_space = ZRange(x.shape[:-1])
 
     op_name = "Linear"
 
     op = graph.add_node(
         BlockOperation(
             name=op_name,
-            index_space=ZRange(y_shape),
+            index_space=index_space,
         )
     )
 
-    graph.add_node(
-        BlockOperation.Input(
-            source_id=op.node_id,
-            target_id=x.node_id,
-            selector=ZRangeMap.identity_map(shape=[1, 2]),
-            name="x",
-        )
+    op.bind_tiled_input(
+        name="input",
+        value=x,
+        projection=[[1, 0]],
+        shape=[1, in_dim],
     )
 
-    graph.add_node(
-        BlockOperation.Input(
-            source_id=op.node_id,
-            target_id=w.node_id,
-            selector=ZRangeMap.constant_map(2, shape=w.shape),
-            name="w",
-        )
-    )
+    op.bind_fixed_input(name="w", value=w)
 
-    y = graph.add_node(
-        TensorResult(
-            name=f"{op_name}:Y",
-            shape=y_shape,
-            dtype="torch.float16",
+    if bias is not None:
+        assert_shape(
+            bias.shape,
+            w.shape[-1:],
+            "bias shape {actual} != weight [out_dim] {expected}",
         )
-    )
 
-    graph.add_node(
-        BlockOperation.Result(
-            source_id=y.node_id,
-            target_id=op.node_id,
-            selector=ZRangeMap.identity_map(y.shape),
-            name="y",
+        op.bind_fixed_input(name="bias", value=bias)
+
+    return op.bind_result(
+        name="result",
+        selector=ZRangeMap(
+            transform=ZTransform(projection=[[1, 0]]),
+            shape=[1, out_dim],
         ),
     )
 
-    return y
 
+def relu_op(
+    value: TensorValue,
+) -> TensorResult:
+    graph = value.assert_graph()
+
+    index_space = ZRange(value.shape)
+
+    op_name = "ReLU"
+
+    op = graph.add_node(
+        BlockOperation(
+            name=op_name,
+            index_space=index_space,
+        )
+    )
+
+    selector = ZRangeMap.identity_map()
+
+    op.bind_input(
+        name="input",
+        value=value,
+        selector=selector,
+    )
+
+    return op.bind_result(
+        name="result",
+        selector=selector,
+    )
 
 
 def raw():
     g = TapestryGraph()
 
     x = g.add_node(
-        ExternalTensor(
+        PinnedTensor(
             name="X",
-            shape=[100, 2],
+            shape=[20, 30, 2],
             dtype="torch.float16",
             storage="store:x",
         )
     )
 
-    w = g.add_node(
-        ExternalTensor(
-            name="W",
+    w1 = g.add_node(
+        PinnedTensor(
+            name="W1",
             shape=[2, 3],
+            dtype="torch.float16",
+            storage="store:w1",
+        )
+    )
+
+    b1 = g.add_node(
+        PinnedTensor(
+            name="B1",
+            shape=[3],
+            dtype="torch.float16",
+            storage="store:b1",
+        )
+    )
+
+    y = relu_op(linear_op(x=x, w=w1, bias=b1))
+
+    w2 = g.add_node(
+        PinnedTensor(
+            name="W1",
+            shape=[3, 4],
             dtype="torch.float16",
             storage="store:w",
         )
     )
 
-    y = f(x, w)
+    z = relu_op(linear_op(x=y, w=w2))
+    print(z.pretty())
 
     g.validate()
+
+    return g
 
 
 if __name__ == "__main__":

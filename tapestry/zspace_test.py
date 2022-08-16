@@ -167,7 +167,25 @@ class ZRangeTest(unittest.TestCase):
         )
 
 
-class ZAffineMapTest(unittest.TestCase):
+class ZTransformTest(unittest.TestCase):
+    def test_call(self):
+        t = ZTransform(
+            projection=[[1, 0], [0, 2]],
+            offset=[-1, -1],
+        )
+        np_eggs.assert_ndarray_equals(
+            t([1, 1]),
+            [0, 1],
+        )
+        np_eggs.assert_ndarray_equals(
+            t([2, 2]),
+            [1, 3],
+        )
+        np_eggs.assert_ndarray_equals(
+            t([20, 2, 2]),
+            [20, 1, 3],
+        )
+
     def test_identity(self):
         eggs.assert_match(
             ZTransform.identity_transform(2),
@@ -289,24 +307,13 @@ class ZAffineMapTest(unittest.TestCase):
 class ZRangeMapTest(unittest.TestCase):
     def test_identity(self):
         eggs.assert_match(
-            ZRangeMap.identity_map([2, 3]),
+            ZRangeMap.identity_map(),
             hamcrest.has_properties(
                 transform=hamcrest.has_properties(
-                    projection=np_eggs.matches_ndarray([[1, 0], [0, 1]]),
-                    offset=np_eggs.matches_ndarray([0, 0]),
+                    projection=np_eggs.matches_ndarray([[1]]),
+                    offset=np_eggs.matches_ndarray([0]),
                 ),
-                shape=np_eggs.matches_ndarray([2, 3]),
-            ),
-        )
-
-        eggs.assert_match(
-            ZRangeMap.identity_map([2, 3], offset=[-1, 2]),
-            hamcrest.has_properties(
-                transform=hamcrest.has_properties(
-                    projection=np_eggs.matches_ndarray([[1, 0], [0, 1]]),
-                    offset=np_eggs.matches_ndarray([-1, 2]),
-                ),
-                shape=np_eggs.matches_ndarray([2, 3]),
+                shape=np_eggs.matches_ndarray([1]),
             ),
         )
 
@@ -457,6 +464,17 @@ class ZRangeMapTest(unittest.TestCase):
             ZRange(
                 start=[-5, 0, 3],
                 end=[-2, 1, 3],
+            ),
+        )
+
+        # broadcast
+        eggs.assert_match(
+            rm(
+                ZRange(start=[20, 1, 1], end=[21, 3, 2]),
+            ),
+            ZRange(
+                start=[20, -5, 0, 3],
+                end=[21, -2, 1, 3],
             ),
         )
 

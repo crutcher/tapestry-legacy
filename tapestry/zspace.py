@@ -5,7 +5,12 @@ from marshmallow import fields
 from marshmallow_dataclass import NewType, dataclass
 import numpy as np
 
-from tapestry.numpy_utils import as_zarray, ndarray_hash, ndarray_lt
+from tapestry.numpy_utils import (
+    as_zarray,
+    ndarray_aggregate_equality,
+    ndarray_hash,
+    ndarray_lt,
+)
 from tapestry.serialization.frozendoc import FrozenDoc
 
 
@@ -221,7 +226,7 @@ class ZTransform(FrozenDoc):
             offset=offset,
         )
 
-    def __init__(self, projection, offset = None):
+    def __init__(self, projection, offset=None):
         with self._thaw_context():
             self.projection = as_zarray(
                 projection,
@@ -276,8 +281,30 @@ class ZTransform(FrozenDoc):
             return False
         return (self.projection == np.identity(self.projection.shape[0])).all()
 
+    def call_result_dims(self, in_dims: int) -> int:
+        """
+        What would the shape of `self(x.ones(in_dims)).shape` be?
+
+        :param in_dims: the number of input dimensions.
+        :return: the expected number of output dimensions.
+        :raises ValueError: if `in_dims < self.in_dim`
+        """
+        if in_dims < self.in_dim:
+            raise ValueError(f"in_dims {in_dims} < than required {self.in_dim}")
+
+        return (in_dims - self.in_dim) + self.out_dim
+
     def __call__(self, coords) -> np.ndarray:
-        return np.matmul(coords, self.projection) + self.offset
+        coords = np.asarray(coords)
+
+        xs = (
+            coords[: -self.in_dim],
+            np.matmul(coords[-self.in_dim :], self.projection) + self.offset,
+        )
+        try:
+            return np.concatenate(xs)
+        except ValueError as e:
+            raise ValueError((coords, xs)) from e
 
     def marginal_strides(self) -> np.ndarray:
         "The marginal strides are the projection."
@@ -298,16 +325,10 @@ class ZRangeMap(FrozenDoc):
     @classmethod
     def identity_map(
         cls,
-        shape=None,
-        *,
-        offset=None,
     ) -> "ZRangeMap":
         return ZRangeMap(
-            transform=ZTransform.identity_transform(
-                n_dim=len(shape),
-                offset=offset,
-            ),
-            shape=shape,
+            transform=ZTransform.identity_transform(1),
+            shape=[1],
         )
 
     @classmethod
@@ -391,9 +412,11 @@ class ZRangeMap(FrozenDoc):
         This will be the coherent union of mapping `point_to_range()` for each
         point; and may contain extra points between mapped shapes.
         """
-        if zrange.ndim != self.in_dim:
+        try:
+            call_dims = self.transform.call_result_dims(zrange.ndim)
+        except ValueError:
             raise ValueError(
-                f"ZRange ndim ({zrange.ndim}) != ZRangeMap in_dim ({self.in_dim})"
+                f"ZRange shape ({zrange.shape}) incompatible with transform in_dim ({self.in_dim})"
             )
 
         assert not zrange.is_empty
@@ -407,16 +430,18 @@ class ZRangeMap(FrozenDoc):
         # We only really care as ndim grows.
 
         corners = sorted(
-            self.transform(zrange.inclusive_corners),
+            (self.transform(corner) for corner in zrange.inclusive_corners),
             key=lambda x: x.tolist(),
         )
 
         least_start = np.array(corners[0])
         greatest_start = np.array(corners[-1])
 
+        call_shape = np.broadcast_shapes(np.ones([call_dims], dtype=int), self.shape)
+
         return ZRange(
             start=least_start,
-            end=greatest_start + self.shape,
+            end=greatest_start + call_shape,
         )
 
     @functools.cache
@@ -432,3 +457,13 @@ class ZRangeMap(FrozenDoc):
         Returns the marginal waste of strides along each dim.
         """
         return (self.transform.marginal_strides() - self.shape).clip(min=0)
+
+
+def assert_shape(
+    actual: np.ndarray,
+    expected: np.ndarray,
+    msg: str = "actual shape {actual} != expected shape {expected}",
+    **kwargs,
+):
+    if not ndarray_aggregate_equality(actual, expected):
+        raise ValueError(msg.format(actual=actual, expected=expected, **kwargs))

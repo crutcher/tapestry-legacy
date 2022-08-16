@@ -21,13 +21,14 @@ import marshmallow
 from marshmallow import fields
 import marshmallow_dataclass
 from marshmallow_oneofschema import OneOfSchema
-import numpy as np
 from overrides import overrides
 import pydot
 
 from tapestry import zspace
+from tapestry.numpy_utils import as_zarray
 from tapestry.serialization.json_serializable import JsonDumpable, JsonLoadable
 from tapestry.type_utils import UUIDConvertable, coerce_optional_uuid, coerce_uuid
+from tapestry.zspace import ZRangeMap, ZTransform
 
 NODE_TYPE_FIELD = "__type__"
 EDGES_FIELD = "__edges__"
@@ -544,7 +545,7 @@ class TensorResult(TensorValue):
 
 @marshmallow_dataclass.add_schema
 @dataclass(kw_only=True)
-class ExternalTensor(TensorValue):
+class PinnedTensor(TensorValue):
     storage: str
 
 
@@ -563,13 +564,20 @@ class BlockOperation(TapestryNode):
             assert self.name
 
         def _validate(self, op: "BlockOperation", tensor: TensorValue):
-            actual = np.array((op.index_space.ndim, tensor.shape.ndim))
-            if (actual == self.selector.shape).all():
+            # TODO: catch and decorate error
+            try:
+                result_range = self.selector(op.index_space)
+                error = False
+            except ValueError:
+                error = True
+
+            if error or len(result_range.start) != len(tensor.shape):
                 raise AssertionError(
-                    f"Selector Dimension Miss-match:\n"
-                    f"{self.pretty()}\n\n"
-                    f"Op {op.pretty()}\n\n"
-                    f"Tensor {tensor.pretty()}"
+                    f"{self.node_type()} Selector Dimension Miss-match:\n"
+                    f"  Index Space: {repr(op.index_space)}\n"
+                    f"  Selector: {repr(self.selector.transform)}\n"
+                    f"  Tensor: {tensor.shape}\n\n"
+                    f"{repr(self)}"
                 )
 
     @marshmallow_dataclass.add_schema
@@ -607,3 +615,97 @@ class BlockOperation(TapestryNode):
             edge_type=BlockOperation.Result,
             target_id=self.node_id,
         )
+
+    def bind_input(
+        self,
+        *,
+        name: str,
+        value: NodeIdCoercible,
+        selector: ZRangeMap,
+    ) -> Input:
+        graph = self.assert_graph()
+        value_id = coerce_node_id(value)
+
+        # TODO: verify this is legal.
+
+        return graph.add_node(
+            BlockOperation.Input(
+                name=name,
+                source_id=self.node_id,
+                target_id=value_id,
+                selector=selector,
+            )
+        )
+
+    def bind_fixed_input(
+        self,
+        *,
+        name: str,
+        value: NodeIdCoercible,
+    ) -> Input:
+        """
+        Construct a fixed Input binding to a value, and add it to the graph.
+
+        :param name: parameter name.
+        :param value: node id (or TensorValue node).
+        :return: the new input node.
+        """
+        graph = self.assert_graph()
+        value_id = coerce_node_id(value)
+        value_node = graph.get_node(value_id, TensorValue)
+
+        return self.bind_input(
+            name=name,
+            value=value,
+            selector=ZRangeMap.constant_map(
+                input_dim=self.index_space.ndim,
+                shape=value_node.shape,
+            ),
+        )
+
+    def bind_tiled_input(
+        self,
+        *,
+        name: str,
+        value: NodeIdCoercible,
+        projection,
+        shape,
+    ) -> Input:
+        shape = as_zarray(shape)
+
+        return self.bind_input(
+            name=name,
+            value=value,
+            selector=ZRangeMap(
+                transform=ZTransform(projection=projection),
+                shape=shape,
+            ),
+        )
+
+    def bind_result(
+        self,
+        *,
+        name: str,
+        selector: ZRangeMap,
+        dtype: str = "torch.float16",
+    ) -> TensorResult:
+        graph = self.assert_graph()
+
+        value = graph.add_node(
+            TensorResult(
+                name=name,
+                shape=selector(self.index_space).end,
+                dtype=dtype,
+            )
+        )
+
+        graph.add_node(
+            BlockOperation.Result(
+                source_id=value.node_id,
+                target_id=self.node_id,
+                selector=selector,
+                name=name,
+            ),
+        )
+
+        return value

@@ -5,7 +5,7 @@ import hamcrest
 import numpy as np
 
 from tapestry.expression_graph import (
-    ExternalTensor,
+    PinnedTensor,
     TapestryEdge,
     TapestryGraph,
     TapestryNode,
@@ -66,7 +66,7 @@ class TapestryGraphTest(unittest.TestCase):
     def test_list_nodes_of_type(self) -> None:
         g = TapestryGraph()
 
-        adoc = ExternalTensor(
+        adoc = PinnedTensor(
             node_id=uuid.uuid4(),
             name="A",
             shape=np.array([2, 3]),
@@ -87,7 +87,7 @@ class TapestryGraphTest(unittest.TestCase):
             g.list_nodes(),
             hamcrest.contains_inanyorder(
                 hamcrest.all_of(
-                    hamcrest.instance_of(ExternalTensor),
+                    hamcrest.instance_of(PinnedTensor),
                     hamcrest.has_property("name", "A"),
                 ),
                 hamcrest.all_of(
@@ -99,10 +99,10 @@ class TapestryGraphTest(unittest.TestCase):
         )
 
         eggs.assert_match(
-            g.list_nodes(ExternalTensor),
+            g.list_nodes(PinnedTensor),
             hamcrest.only_contains(
                 hamcrest.all_of(
-                    hamcrest.instance_of(ExternalTensor),
+                    hamcrest.instance_of(PinnedTensor),
                     hamcrest.has_property("name", "A"),
                 ),
             ),
@@ -111,7 +111,7 @@ class TapestryGraphTest(unittest.TestCase):
     def test_get_node(self) -> None:
         g = TapestryGraph()
 
-        adoc = ExternalTensor(
+        adoc = PinnedTensor(
             node_id=uuid.uuid4(),
             name="A",
             shape=np.array([2, 3]),
@@ -132,7 +132,7 @@ class TapestryGraphTest(unittest.TestCase):
         eggs.assert_match(
             g.get_node(adoc.node_id),
             hamcrest.all_of(
-                hamcrest.instance_of(ExternalTensor),
+                hamcrest.instance_of(PinnedTensor),
                 hamcrest.has_property("name", "A"),
             ),
         )
@@ -141,15 +141,15 @@ class TapestryGraphTest(unittest.TestCase):
         eggs.assert_match(
             g.get_node(str(adoc.node_id)),
             hamcrest.all_of(
-                hamcrest.instance_of(ExternalTensor),
+                hamcrest.instance_of(PinnedTensor),
                 hamcrest.has_property("name", "A"),
             ),
         )
 
         eggs.assert_match(
-            g.get_node(adoc.node_id, ExternalTensor),
+            g.get_node(adoc.node_id, PinnedTensor),
             hamcrest.all_of(
-                hamcrest.instance_of(ExternalTensor),
+                hamcrest.instance_of(PinnedTensor),
                 hamcrest.has_property("name", "A"),
             ),
         )
@@ -165,7 +165,7 @@ class TapestryGraphTest(unittest.TestCase):
 
     def test_schema(self) -> None:
         g = TapestryGraph()
-        a = ExternalTensor(
+        a = PinnedTensor(
             node_id=uuid.uuid4(),
             name="A",
             shape=np.array([2, 3]),
@@ -199,14 +199,14 @@ class TapestryGraphTest(unittest.TestCase):
             [
                 TapestryEdge,
                 TensorValue,
-                ExternalTensor,
+                PinnedTensor,
             ]
         )
 
         expected_json = {
             "nodes": {
                 str(a.node_id): {
-                    "__type__": "ExternalTensor",
+                    "__type__": "PinnedTensor",
                     **a.dump_json_data(),
                     "__edges__": [
                         {
@@ -238,7 +238,7 @@ class TapestryGraphTest(unittest.TestCase):
 
     def test_assert_node_types(self) -> None:
         g = TapestryGraph()
-        a = ExternalTensor(
+        a = PinnedTensor(
             node_id=uuid.uuid4(),
             name="A",
             shape=np.array([2, 3]),
@@ -257,7 +257,7 @@ class TapestryGraphTest(unittest.TestCase):
 
         g.assert_node_types(
             [
-                ExternalTensor,
+                PinnedTensor,
                 TensorValue,
             ]
         )
@@ -269,7 +269,7 @@ class TapestryGraphTest(unittest.TestCase):
                 ],
             ),
             ValueError,
-            r"\[ExternalTensor, TensorValue\]",
+            r"\[PinnedTensor, TensorValue\]",
         )
 
     def test_edges(self) -> None:

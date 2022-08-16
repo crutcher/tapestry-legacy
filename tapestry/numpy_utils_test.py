@@ -4,11 +4,22 @@ import numpy as np
 from tapestry.numpy_utils import (
     as_zarray,
     make_ndarray_immutable,
+    ndarray_aggregate_equality,
     ndarray_hash,
     ndarray_le,
     ndarray_lt,
 )
 from tapestry.testlib import eggs, np_eggs
+
+
+def test_ndarray_aggregate_equality():
+    eggs.assert_true(ndarray_aggregate_equality([1, 2], np.array([1, 2])))
+    eggs.assert_true(ndarray_aggregate_equality(np.array([1, 2]), [1, 2]))
+
+    eggs.assert_false(ndarray_aggregate_equality([1, 3], np.array([1, 2])))
+    eggs.assert_false(ndarray_aggregate_equality(np.array([1, 3]), [1, 2]))
+
+    eggs.assert_false(ndarray_aggregate_equality([[2, 3], [2, 3]], np.array([1, 2])))
 
 
 def test_ndarray_hash():
