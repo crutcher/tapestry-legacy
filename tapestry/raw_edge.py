@@ -1,5 +1,7 @@
 from typing import Optional
 
+import torch
+
 from tapestry.expression_graph import (
     BlockOperation,
     PinnedTensor,
@@ -115,7 +117,7 @@ def raw():
         PinnedTensor(
             name="X",
             shape=[20, 30, 2],
-            dtype="torch.float16",
+            dtype=torch.float16,
             storage="store:x",
         )
     )
@@ -124,7 +126,7 @@ def raw():
         PinnedTensor(
             name="W1",
             shape=[2, 3],
-            dtype="torch.float16",
+            dtype=torch.float16,
             storage="store:w1",
         )
     )
@@ -133,7 +135,7 @@ def raw():
         PinnedTensor(
             name="B1",
             shape=[3],
-            dtype="torch.float16",
+            dtype=torch.float16,
             storage="store:b1",
         )
     )
@@ -144,7 +146,7 @@ def raw():
         PinnedTensor(
             name="W1",
             shape=[3, 4],
-            dtype="torch.float16",
+            dtype=torch.float16,
             storage="store:w",
         )
     )

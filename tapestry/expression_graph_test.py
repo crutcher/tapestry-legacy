@@ -3,6 +3,7 @@ import uuid
 
 import hamcrest
 import numpy as np
+import torch
 
 from tapestry.expression_graph import (
     PinnedTensor,
@@ -70,7 +71,7 @@ class TapestryGraphTest(unittest.TestCase):
             node_id=uuid.uuid4(),
             name="A",
             shape=np.array([2, 3]),
-            dtype="torch.int64",
+            dtype=torch.int64,
             storage="pre:A",
         )
         g.add_node(adoc)
@@ -78,7 +79,7 @@ class TapestryGraphTest(unittest.TestCase):
         bdoc = TensorValue(
             node_id=uuid.uuid4(),
             shape=np.array([2, 3]),
-            dtype="torch.int64",
+            dtype=torch.int64,
             name="B",
         )
         g.add_node(bdoc)
@@ -115,7 +116,7 @@ class TapestryGraphTest(unittest.TestCase):
             node_id=uuid.uuid4(),
             name="A",
             shape=np.array([2, 3]),
-            dtype="torch.int64",
+            dtype=torch.int64,
             storage="pre:A",
         )
         g.add_node(adoc)
@@ -123,7 +124,7 @@ class TapestryGraphTest(unittest.TestCase):
         bdoc = TensorValue(
             node_id=uuid.uuid4(),
             shape=np.array([2, 3]),
-            dtype="torch.int64",
+            dtype=torch.int64,
             name="B",
         )
         g.add_node(bdoc)
@@ -169,7 +170,7 @@ class TapestryGraphTest(unittest.TestCase):
             node_id=uuid.uuid4(),
             name="A",
             shape=np.array([2, 3]),
-            dtype="torch.int64",
+            dtype=torch.int64,
             storage="pre:A",
         )
         g.add_node(a)
@@ -183,7 +184,7 @@ class TapestryGraphTest(unittest.TestCase):
             node_id=uuid.uuid4(),
             name="B",
             shape=np.array([2, 3]),
-            dtype="torch.int64",
+            dtype=torch.int64,
         )
         g.add_node(b)
 
@@ -242,7 +243,7 @@ class TapestryGraphTest(unittest.TestCase):
             node_id=uuid.uuid4(),
             name="A",
             shape=np.array([2, 3]),
-            dtype="torch.int64",
+            dtype=torch.int64,
             storage="pre:A",
         )
         g.add_node(a)
@@ -251,7 +252,7 @@ class TapestryGraphTest(unittest.TestCase):
             node_id=uuid.uuid4(),
             name="B",
             shape=np.array([2, 3]),
-            dtype="torch.int64",
+            dtype=torch.int64,
         )
         g.add_node(b)
 

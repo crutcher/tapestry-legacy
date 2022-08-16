@@ -20,9 +20,11 @@ import weakref
 import marshmallow
 from marshmallow import fields
 import marshmallow_dataclass
+from marshmallow_dataclass import NewType
 from marshmallow_oneofschema import OneOfSchema
 from overrides import overrides
 import pydot
+import torch
 
 from tapestry import zspace
 from tapestry.numpy_utils import as_zarray
@@ -52,6 +54,51 @@ def coerce_optional_node_id(
     if val is None:
         return None
     return coerce_node_id(val)
+
+
+def find_dtype(name: str) -> torch.dtype:
+    if not name.startswith("torch."):
+        raise AssertionError(f"Not a pytorch dtype: {name}")
+
+    sname = name.removeprefix("torch.")
+    dtype = getattr(torch, sname)
+    assert isinstance(dtype, torch.dtype), f"{name} exists but is {type(dtype)}"
+    return dtype
+
+
+class DTypeField(fields.Field):
+    """
+    Marshmallow Field type for torch.dtype.
+
+    Depends upon the following `setup.cfg` for mpyp:
+
+    >>> [mypy]
+    >>> plugins = marshmallow_dataclass.mypy
+    """
+
+    def __init__(self, *args, **kwargs):
+        super(DTypeField, self).__init__(*args, **kwargs)
+
+    def _serialize(self, value: torch.dtype, *args, **kwargs):
+        return str(value)
+
+    def _deserialize(self, value, *args, **kwargs):
+        if value is None:
+            return None
+
+        return find_dtype(value)
+
+
+DType = NewType("torch.dtype", torch.dtype, field=DTypeField)
+"""
+Marshmallow NewType for DTypeField.
+
+Usage:
+
+>>> @marshmallow_dataclass.dataclass
+... class Example:
+...     coords: DType
+"""
 
 
 @marshmallow_dataclass.add_schema
@@ -531,7 +578,7 @@ class TapestryGraph(JsonDumpable):
 @dataclass(kw_only=True)
 class TensorValue(TapestryNode):
     shape: zspace.ZArray
-    dtype: str
+    dtype: DType
 
     def __post_init__(self):
         self.shape = zspace.as_zarray(self.shape)
@@ -687,7 +734,7 @@ class BlockOperation(TapestryNode):
         *,
         name: str,
         selector: ZRangeMap,
-        dtype: str = "torch.float16",
+        dtype: torch.dtype = torch.float16,
     ) -> TensorResult:
         graph = self.assert_graph()
 
