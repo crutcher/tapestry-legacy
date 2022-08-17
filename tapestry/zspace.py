@@ -1,3 +1,4 @@
+import enum
 import functools
 from typing import Iterable, List
 
@@ -168,21 +169,35 @@ class ZRange(FrozenDoc):
         return corners
 
 
+class BroadcastMode(enum.Enum):
+    ERROR = enum.auto()
+    CLIP = enum.auto()
+    BROADCAST = enum.auto()
+
+
 @dataclass
 class ZTransform(FrozenDoc):
     """
     Affine ℤ-Space index_map from one coordinate space to another.
     """
 
-    __slots__ = ("projection", "offset")
+    __slots__ = ("projection", "offset", "extension")
 
     projection: ZArray
     """The projection matrix."""
     offset: ZArray
     """The offset vector."""
 
+    on_broadcast: BroadcastMode
+
     @classmethod
-    def identity_transform(cls, n_dim: int, offset=None) -> "ZTransform":
+    def identity_transform(
+        cls,
+        n_dim: int,
+        *,
+        offset=None,
+        on_broadcast: BroadcastMode = BroadcastMode.BROADCAST,
+    ) -> "ZTransform":
         """
         Construct an identity transform in the given dimensions.
 
@@ -196,6 +211,7 @@ class ZTransform(FrozenDoc):
         return ZTransform(
             projection=np.identity(n_dim, dtype=int),
             offset=offset,
+            on_broadcast=on_broadcast,
         )
 
     @classmethod
@@ -226,7 +242,12 @@ class ZTransform(FrozenDoc):
             offset=offset,
         )
 
-    def __init__(self, projection, offset=None):
+    def __init__(
+        self,
+        projection,
+        offset=None,
+        on_broadcast: BroadcastMode = BroadcastMode.ERROR,
+    ):
         with self._thaw_context():
             self.projection = as_zarray(
                 projection,
@@ -242,6 +263,15 @@ class ZTransform(FrozenDoc):
                 ndim=1,
                 immutable=True,
             )
+
+            if on_broadcast not in (
+                BroadcastMode.CLIP,
+                BroadcastMode.BROADCAST,
+                BroadcastMode.ERROR,
+            ):
+                raise ValueError(f"Unsupported extension mode {on_broadcast}")
+
+            self.on_broadcast = on_broadcast
 
         if self.out_dim != self.offset.shape[0]:
             raise ValueError(
@@ -292,19 +322,44 @@ class ZTransform(FrozenDoc):
         if in_dims < self.in_dim:
             raise ValueError(f"in_dims {in_dims} < than required {self.in_dim}")
 
-        return (in_dims - self.in_dim) + self.out_dim
+        if self.on_broadcast is BroadcastMode.ERROR:
+            if in_dims != self.in_dim:
+                raise ValueError(
+                    f"source in_dims ({in_dims}) != required "
+                    f"in_dims ({self.in_dim}) in mode {self.on_broadcast}",
+                )
+            return self.in_dim
+
+        elif self.on_broadcast is BroadcastMode.CLIP:
+            return self.in_dim
+
+        elif self.on_broadcast is BroadcastMode.BROADCAST:
+            return (in_dims - self.in_dim) + self.out_dim
+
+        raise RuntimeError(f"Invalid mode {self.on_broadcast}")
 
     def __call__(self, coords) -> np.ndarray:
         coords = np.asarray(coords)
+        prefix = coords[: -self.in_dim]
 
-        xs = (
-            coords[: -self.in_dim],
-            np.matmul(coords[-self.in_dim :], self.projection) + self.offset,
-        )
-        try:
-            return np.concatenate(xs)
-        except ValueError as e:
-            raise ValueError((coords, xs)) from e
+        target = np.matmul(coords[-self.in_dim :], self.projection) + self.offset
+
+        if len(prefix):
+            if self.on_broadcast is BroadcastMode.ERROR:
+                raise ValueError(
+                    f"Input has dims {len(coords)}, transform expects {self.in_dim}, and mode is {self.on_broadcast}"
+                )
+
+            elif self.on_broadcast is BroadcastMode.CLIP:
+                pass
+
+            elif self.on_broadcast is BroadcastMode.BROADCAST:
+                target = np.concatenate((prefix, target))
+
+            else:
+                raise RuntimeError(f"Unknown extension mode: {self.on_broadcast}")
+
+        return target
 
     def marginal_strides(self) -> np.ndarray:
         "The marginal strides are the projection."
@@ -325,9 +380,10 @@ class ZRangeMap(FrozenDoc):
     @classmethod
     def identity_map(
         cls,
+        on_broadcast: BroadcastMode = BroadcastMode.BROADCAST,
     ) -> "ZRangeMap":
         return ZRangeMap(
-            transform=ZTransform.identity_transform(1),
+            transform=ZTransform.identity_transform(1, on_broadcast=on_broadcast),
             shape=[1],
         )
 
@@ -412,12 +468,7 @@ class ZRangeMap(FrozenDoc):
         This will be the coherent union of mapping `point_to_range()` for each
         point; and may contain extra points between mapped shapes.
         """
-        try:
-            call_dims = self.transform.call_result_dims(zrange.ndim)
-        except ValueError:
-            raise ValueError(
-                f"ZRange shape ({zrange.shape}) incompatible with transform in_dim ({self.in_dim})"
-            )
+        call_dims = self.transform.call_result_dims(zrange.ndim)
 
         assert not zrange.is_empty
 

@@ -10,7 +10,7 @@ from tapestry.expression_graph import (
     TensorResult,
     TensorValue,
 )
-from tapestry.zspace import ZRange, ZRangeMap, ZTransform, assert_shape
+from tapestry.zspace import BroadcastMode, ZRange, ZRangeMap, ZTransform, assert_shape
 
 
 def _name_and_shape(val: TensorValue):
@@ -43,65 +43,6 @@ def linear_op(
         wshape=w.shape,
     )
 
-    index_space = ZRange(x.shape[:-1])
-
-    op_name = "Linear"
-
-    op = graph.add_node(
-        BlockOperation(
-            name=op_name,
-            index_space=index_space,
-        )
-    )
-
-    op.bind_tiled_input(
-        name="input",
-        value=x,
-        projection=[[1, 0]],
-        shape=[1, in_dim],
-    )
-
-    op.bind_fixed_input(name="w", value=w)
-
-    if bias is not None:
-        assert_shape(
-            bias.shape,
-            w.shape[-1:],
-            "bias shape {actual} != weight [out_dim] {expected}",
-        )
-
-        op.bind_fixed_input(name="bias", value=bias)
-
-    return op.bind_result(
-        name="result",
-        selector=ZRangeMap(
-            transform=ZTransform(projection=[[1, 0]]),
-            shape=[1, out_dim],
-        ),
-    )
-
-def linear_op_shard_w(
-        *,
-        x: TensorValue,
-        w: TensorValue,
-        bias: Optional[TensorValue] = None,
-) -> TensorResult:
-    graph = x.assert_graph()
-    assert w.graph == graph
-
-    assert len(w.shape) == 2, w.shape
-    in_dim = w.shape[0]
-    out_dim = w.shape[1]
-
-    assert_shape(
-        x.shape[-1:],
-        w.shape[:1],
-        "input shape {xshape} in_dim {actual} incompatible "
-        "with weight shape {wshape} in_dim {expected}",
-        xshape=x.shape,
-        wshape=w.shape,
-    )
-
     index_space = ZRange(x.shape[:-1].tolist() + [out_dim])
 
     op_name = "Linear"
@@ -113,8 +54,6 @@ def linear_op_shard_w(
         )
     )
 
-    # TODO: broadcast-one (naming?)
-    # broadcasting to additional dimensions should include them.
     op.bind_tiled_input(
         name="input",
         value=x,
@@ -125,8 +64,6 @@ def linear_op_shard_w(
     projection = np.zeros((index_space.ndim, 2))
     projection[-1, -1] = 1
 
-    # TODO: broadcast-zero (naming?)
-    # broadcasting to additional dimensions should ignore them.
     op.bind_tiled_input(
         name="w",
         value=w,
@@ -146,12 +83,16 @@ def linear_op_shard_w(
             value=bias,
             projection=[[0], [1]],
             shape=[1],
+            on_broadcast=BroadcastMode.CLIP,
         )
 
     return op.bind_result(
         name="result",
         selector=ZRangeMap(
-            transform=ZTransform(projection=[[1, 0], [0, 1]]),
+            transform=ZTransform(
+                projection=[[1, 0], [0, 1]],
+                on_broadcast=BroadcastMode.BROADCAST,
+            ),
             shape=[1, 1],
         ),
     )
@@ -217,9 +158,7 @@ def raw():
         )
     )
 
-    a = linear_op_shard_w(x=x, w=w1, bias=b1)
-    g.validate()
-    return g
+    a = linear_op(x=x, w=w1, bias=b1)
 
     y = relu_op(a)
 
@@ -234,6 +173,9 @@ def raw():
 
     z = relu_op(linear_op(x=y, w=w2))
     print(z.pretty())
+
+    g.mark_observed(a)
+    g.mark_observed(z)
 
     g.validate()
 

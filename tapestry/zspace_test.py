@@ -7,7 +7,7 @@ import numpy as np
 from tapestry.serialization.json_serializable import JsonLoadable
 from tapestry.serialization.json_testlib import assert_json_serializable_roundtrip
 from tapestry.testlib import eggs, np_eggs
-from tapestry.zspace import ZArray, ZRange, ZRangeMap, ZTransform
+from tapestry.zspace import BroadcastMode, ZArray, ZRange, ZRangeMap, ZTransform
 
 
 def _assert_hash_eq(a, b):
@@ -181,9 +181,39 @@ class ZTransformTest(unittest.TestCase):
             t([2, 2]),
             [1, 3],
         )
+        eggs.assert_raises(
+            lambda: t([20, 2, 2]),
+            ValueError,
+        )
+
+        eggs.assert_raises(
+            lambda: ZTransform(
+                projection=[[1, 0], [0, 2]],
+                offset=[-1, -1],
+                on_broadcast=BroadcastMode.ERROR,
+            )([20, 2, 2]),
+            ValueError,
+        )
+
         np_eggs.assert_ndarray_equals(
-            t([20, 2, 2]),
-            [20, 1, 3],
+            ZTransform(
+                projection=[[-2, 0, 1], [0, 1, 1]],
+                offset=[-1, -1, 0],
+                on_broadcast=BroadcastMode.BROADCAST,
+            )(
+                [21, 3, 2],
+            ),
+            [21, -7, 1, 5],
+        )
+        np_eggs.assert_ndarray_equals(
+            ZTransform(
+                projection=[[-2, 0, 1], [0, 1, 1]],
+                offset=[-1, -1, 0],
+                on_broadcast=BroadcastMode.CLIP,
+            )(
+                [21, 3, 2],
+            ),
+            [-7, 1, 5],
         )
 
     def test_identity(self):
@@ -196,7 +226,7 @@ class ZTransformTest(unittest.TestCase):
         )
 
         eggs.assert_match(
-            ZTransform.identity_transform(2, [-1, 2]),
+            ZTransform.identity_transform(2, offset=[-1, 2]),
             hamcrest.has_properties(
                 projection=np_eggs.matches_ndarray([[1, 0], [0, 1]]),
                 offset=np_eggs.matches_ndarray([-1, 2]),
@@ -248,7 +278,11 @@ class ZTransformTest(unittest.TestCase):
                 projection=[[2, 0], [0, 1]],
                 offset=[-5, 3],
             ),
-            {"projection": [[2, 0], [0, 1]], "offset": [-5, 3]},
+            {
+                "projection": [[2, 0], [0, 1]],
+                "offset": [-5, 3],
+                "on_broadcast": "ERROR",
+            },
         )
 
     def test_hash_eq(self) -> None:
@@ -357,7 +391,11 @@ class ZRangeMapTest(unittest.TestCase):
                 shape=[2, 2],
             ),
             {
-                "transform": {"projection": [[2, 0], [0, 1]], "offset": [-5, 3]},
+                "transform": {
+                    "projection": [[2, 0], [0, 1]],
+                    "offset": [-5, 3],
+                    "on_broadcast": "ERROR",
+                },
                 "shape": [2, 2],
             },
         )
@@ -468,13 +506,42 @@ class ZRangeMapTest(unittest.TestCase):
         )
 
         # broadcast
+        eggs.assert_raises(
+            lambda: rm(
+                ZRange(start=[20, 1, 1], end=[21, 3, 2]),
+            ),
+            ValueError,
+        )
         eggs.assert_match(
-            rm(
+            ZRangeMap(
+                transform=ZTransform(
+                    projection=[[-2, 0, 1], [0, 1, 1]],
+                    offset=[-1, -1, 0],
+                    on_broadcast=BroadcastMode.BROADCAST,
+                ),
+                shape=[1, 1, 1],
+            )(
                 ZRange(start=[20, 1, 1], end=[21, 3, 2]),
             ),
             ZRange(
                 start=[20, -5, 0, 3],
                 end=[21, -2, 1, 3],
+            ),
+        )
+        eggs.assert_match(
+            ZRangeMap(
+                transform=ZTransform(
+                    projection=[[-2, 0, 1], [0, 1, 1]],
+                    offset=[-1, -1, 0],
+                    on_broadcast=BroadcastMode.CLIP,
+                ),
+                shape=[1, 1, 1],
+            )(
+                ZRange(start=[20, 1, 1], end=[21, 3, 2]),
+            ),
+            ZRange(
+                start=[-5, 0, 3],
+                end=[-2, 1, 3],
             ),
         )
 

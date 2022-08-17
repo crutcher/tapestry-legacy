@@ -8,6 +8,7 @@ from typing import (
     Iterable,
     List,
     Optional,
+    Set,
     Type,
     TypeVar,
     Union,
@@ -30,7 +31,7 @@ from tapestry import zspace
 from tapestry.numpy_utils import as_zarray
 from tapestry.serialization.json_serializable import JsonDumpable, JsonLoadable
 from tapestry.type_utils import UUIDConvertable, coerce_optional_uuid, coerce_uuid
-from tapestry.zspace import ZRangeMap, ZTransform
+from tapestry.zspace import BroadcastMode, ZRangeMap, ZTransform
 
 NODE_TYPE_FIELD = "__type__"
 EDGES_FIELD = "__edges__"
@@ -214,6 +215,7 @@ class TapestryGraph(JsonDumpable):
     """
 
     nodes: Dict[uuid.UUID, TapestryNode]
+    observed: Set[uuid.UUID]
 
     @classmethod
     def build_load_schema(
@@ -300,11 +302,18 @@ class TapestryGraph(JsonDumpable):
         self,
         *,
         nodes: Optional[Dict[uuid.UUID, TapestryNode]] = None,
+        observed: Optional[Iterable[NodeIdCoercible]] = None,
     ):
         self.nodes = {}
+        self.observed = set()
+
         if nodes is not None:
             for n in nodes.values():
                 self.add_node(n)
+
+        if observed:
+            for node in observed:
+                self.mark_observed(node)
 
     def validate(self) -> None:
         for node in self.nodes.values():
@@ -319,6 +328,8 @@ class TapestryGraph(JsonDumpable):
         g = TapestryGraph()
         for node in self.nodes.values():
             g.add_node(node.clone())
+        for node_id in self.observed:
+            g.mark_observed(node_id)
         return g
 
     @overload
@@ -362,18 +373,18 @@ class TapestryGraph(JsonDumpable):
             )
         return cast(_TapestryNodeT, node)
 
-    def remove_node(self, node: UUIDConvertable | TapestryNode) -> None:
+    def remove_node(self, node: NodeIdCoercible) -> None:
         """
         Remove a node from the graph.
 
         :param node: the node to remove.
         :raises KeyError: if the node is not in the graph.
         """
-        if not isinstance(node, TapestryNode):
-            node = self.get_node(coerce_uuid(node))
+        node_id = coerce_node_id(node)
+        node = self.get_node(node_id)
 
-        if node.node_id not in self.nodes:
-            raise KeyError(f"Node {node.node_id} not in graph:\n{node.pretty()}")
+        if node_id in self.observed:
+            raise ValueError(f"Can't remove an observed node: {node_id}\n\n{node}")
 
         del node.graph
         del self.nodes[node.node_id]
@@ -478,6 +489,20 @@ class TapestryGraph(JsonDumpable):
 
         return node
 
+    def mark_observed(self, node: NodeIdCoercible) -> None:
+        node_id = coerce_node_id(node)
+        node = self.get_node(node_id)
+
+        if node_id not in self.nodes:
+            raise ValueError(
+                f"Can't observe a node not in the graph: {node}",
+            )
+        self.observed.add(node_id)
+
+    def clear_observed(self, node: NodeIdCoercible) -> None:
+        node_id = coerce_node_id(node)
+        self.observed.remove(node_id)
+
     def assert_node_types(
         self,
         node_types: Iterable[Type[TapestryNode]],
@@ -571,6 +596,18 @@ class TapestryGraph(JsonDumpable):
                     ),
                 )
 
+        if self.observed:
+            dot.add_node(
+                pydot.Node("Observer"),
+            )
+            for node_id in self.observed:
+                dot.add_edge(
+                    pydot.Edge(
+                        "Observer",
+                        str(node_id),
+                    ),
+                )
+
         return dot
 
 
@@ -612,7 +649,16 @@ class BlockOperation(TapestryNode):
 
         def _validate(self, op: "BlockOperation", tensor: TensorValue):
             # TODO: catch and decorate error
-            result_range = self.selector(op.index_space)
+            try:
+                result_range = self.selector(op.index_space)
+            except ValueError as e:
+                raise AssertionError(
+                    f"{self.node_type()} Selector incompatible with index_space:\n"
+                    f"  Index Space: {repr(op.index_space)}\n"
+                    f"  Selector: {repr(self.selector.transform)}\n\n"
+                    f"  {repr(self)}"
+                ) from e
+
             if len(result_range.start) != len(tensor.shape):
                 raise AssertionError(
                     f"{self.node_type()} Selector Dimension Miss-match:\n"
@@ -620,7 +666,7 @@ class BlockOperation(TapestryNode):
                     f"  Selector: {repr(self.selector.transform)}\n"
                     f"  Selected Space: {repr(result_range)}\n"
                     f"  Tensor: {tensor.shape}\n\n"
-                    f"{repr(self)}"
+                    f"  {repr(self)}"
                 )
 
     @marshmallow_dataclass.add_schema
@@ -681,11 +727,11 @@ class BlockOperation(TapestryNode):
         )
 
     def bind_result(
-            self,
-            *,
-            name: str,
-            selector: ZRangeMap,
-            dtype: torch.dtype = torch.float16,
+        self,
+        *,
+        name: str,
+        selector: ZRangeMap,
+        dtype: torch.dtype = torch.float16,
     ) -> TensorResult:
         graph = self.assert_graph()
 
@@ -741,6 +787,7 @@ class BlockOperation(TapestryNode):
         value: NodeIdCoercible,
         projection,
         shape,
+        on_broadcast: BroadcastMode = BroadcastMode.BROADCAST,
     ) -> Input:
         shape = as_zarray(shape)
 
@@ -748,7 +795,10 @@ class BlockOperation(TapestryNode):
             name=name,
             value=value,
             selector=ZRangeMap(
-                transform=ZTransform(projection=projection),
+                transform=ZTransform(
+                    projection=projection,
+                    on_broadcast=on_broadcast,
+                ),
                 shape=shape,
             ),
         )

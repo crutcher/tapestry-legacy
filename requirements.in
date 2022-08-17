@@ -60,4 +60,5 @@ matplotlib
 marshmallow
 marshmallow-dataclass
 marshmallow-oneofschema
+marshmallow_enum
 
