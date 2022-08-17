@@ -612,17 +612,13 @@ class BlockOperation(TapestryNode):
 
         def _validate(self, op: "BlockOperation", tensor: TensorValue):
             # TODO: catch and decorate error
-            try:
-                result_range = self.selector(op.index_space)
-                error = False
-            except ValueError:
-                error = True
-
-            if error or len(result_range.start) != len(tensor.shape):
+            result_range = self.selector(op.index_space)
+            if len(result_range.start) != len(tensor.shape):
                 raise AssertionError(
                     f"{self.node_type()} Selector Dimension Miss-match:\n"
                     f"  Index Space: {repr(op.index_space)}\n"
                     f"  Selector: {repr(self.selector.transform)}\n"
+                    f"  Selected Space: {repr(result_range)}\n"
                     f"  Tensor: {tensor.shape}\n\n"
                     f"{repr(self)}"
                 )
@@ -684,6 +680,34 @@ class BlockOperation(TapestryNode):
             )
         )
 
+    def bind_result(
+            self,
+            *,
+            name: str,
+            selector: ZRangeMap,
+            dtype: torch.dtype = torch.float16,
+    ) -> TensorResult:
+        graph = self.assert_graph()
+
+        value = graph.add_node(
+            TensorResult(
+                name=name,
+                shape=selector(self.index_space).end,
+                dtype=dtype,
+            )
+        )
+
+        graph.add_node(
+            BlockOperation.Result(
+                source_id=value.node_id,
+                target_id=self.node_id,
+                selector=selector,
+                name=name,
+            ),
+        )
+
+        return value
+
     def bind_fixed_input(
         self,
         *,
@@ -728,31 +752,3 @@ class BlockOperation(TapestryNode):
                 shape=shape,
             ),
         )
-
-    def bind_result(
-        self,
-        *,
-        name: str,
-        selector: ZRangeMap,
-        dtype: torch.dtype = torch.float16,
-    ) -> TensorResult:
-        graph = self.assert_graph()
-
-        value = graph.add_node(
-            TensorResult(
-                name=name,
-                shape=selector(self.index_space).end,
-                dtype=dtype,
-            )
-        )
-
-        graph.add_node(
-            BlockOperation.Result(
-                source_id=value.node_id,
-                target_id=self.node_id,
-                selector=selector,
-                name=name,
-            ),
-        )
-
-        return value

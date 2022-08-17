@@ -1,5 +1,6 @@
 from typing import Optional
 
+import numpy as np
 import torch
 
 from tapestry.expression_graph import (
@@ -79,6 +80,82 @@ def linear_op(
         ),
     )
 
+def linear_op_shard_w(
+        *,
+        x: TensorValue,
+        w: TensorValue,
+        bias: Optional[TensorValue] = None,
+) -> TensorResult:
+    graph = x.assert_graph()
+    assert w.graph == graph
+
+    assert len(w.shape) == 2, w.shape
+    in_dim = w.shape[0]
+    out_dim = w.shape[1]
+
+    assert_shape(
+        x.shape[-1:],
+        w.shape[:1],
+        "input shape {xshape} in_dim {actual} incompatible "
+        "with weight shape {wshape} in_dim {expected}",
+        xshape=x.shape,
+        wshape=w.shape,
+    )
+
+    index_space = ZRange(x.shape[:-1].tolist() + [out_dim])
+
+    op_name = "Linear"
+
+    op = graph.add_node(
+        BlockOperation(
+            name=op_name,
+            index_space=index_space,
+        )
+    )
+
+    # TODO: broadcast-one (naming?)
+    # broadcasting to additional dimensions should include them.
+    op.bind_tiled_input(
+        name="input",
+        value=x,
+        projection=[[1, 0], [0, 0]],
+        shape=[1, in_dim],
+    )
+
+    projection = np.zeros((index_space.ndim, 2))
+    projection[-1, -1] = 1
+
+    # TODO: broadcast-zero (naming?)
+    # broadcasting to additional dimensions should ignore them.
+    op.bind_tiled_input(
+        name="w",
+        value=w,
+        projection=projection,
+        shape=[in_dim, 1],
+    )
+
+    if bias is not None:
+        assert_shape(
+            bias.shape,
+            w.shape[-1:],
+            "bias shape {actual} != weight [out_dim] {expected}",
+        )
+
+        op.bind_tiled_input(
+            name="bias",
+            value=bias,
+            projection=[[0], [1]],
+            shape=[1],
+        )
+
+    return op.bind_result(
+        name="result",
+        selector=ZRangeMap(
+            transform=ZTransform(projection=[[1, 0], [0, 1]]),
+            shape=[1, 1],
+        ),
+    )
+
 
 def relu_op(
     value: TensorValue,
@@ -140,7 +217,11 @@ def raw():
         )
     )
 
-    y = relu_op(linear_op(x=x, w=w1, bias=b1))
+    a = linear_op_shard_w(x=x, w=w1, bias=b1)
+    g.validate()
+    return g
+
+    y = relu_op(a)
 
     w2 = g.add_node(
         PinnedTensor(
