@@ -10,7 +10,7 @@ from tapestry.expression_graph import (
     TensorResult,
     TensorValue,
 )
-from tapestry.zspace import BroadcastMode, ZRange, ZRangeMap, ZTransform, assert_shape
+from tapestry.zspace import EmbeddingMode, ZRange, ZRangeMap, ZTransform, assert_shape
 
 
 def _name_and_shape(val: TensorValue):
@@ -54,21 +54,32 @@ def linear_op(
         )
     )
 
-    op.bind_tiled_input(
+    op.bind_input(
         name="input",
         value=x,
-        projection=[[1, 0], [0, 0]],
-        shape=[1, in_dim],
+        selector=ZRangeMap(
+            transform=ZTransform(
+                projection=[
+                    [1, 0],
+                    [0, 0],
+                    ],
+            ),
+            shape=[1, in_dim],
+        ).embed(op.index_space.ndim, mode=EmbeddingMode.TILE),
     )
 
     projection = np.zeros((index_space.ndim, 2))
     projection[-1, -1] = 1
 
-    op.bind_tiled_input(
+    op.bind_input(
         name="w",
         value=w,
-        projection=projection,
-        shape=[in_dim, 1],
+        selector=ZRangeMap(
+            transform=ZTransform(
+                projection=projection,
+            ),
+            shape=[in_dim, 1],
+        ).embed(op.index_space.ndim, mode=EmbeddingMode.CLIP),
     )
 
     if bias is not None:
@@ -78,12 +89,13 @@ def linear_op(
             "bias shape {actual} != weight [out_dim] {expected}",
         )
 
-        op.bind_tiled_input(
+        op.bind_input(
             name="bias",
             value=bias,
-            projection=[[0], [1]],
-            shape=[1],
-            on_broadcast=BroadcastMode.CLIP,
+            selector=ZRangeMap(
+                transform=ZTransform(projection=[[0], [1]]),
+                shape=[1],
+            ).embed(op.index_space.ndim, mode=EmbeddingMode.CLIP),
         )
 
     return op.bind_result(
@@ -91,10 +103,9 @@ def linear_op(
         selector=ZRangeMap(
             transform=ZTransform(
                 projection=[[1, 0], [0, 1]],
-                on_broadcast=BroadcastMode.BROADCAST,
             ),
             shape=[1, 1],
-        ),
+        ).embed(op.index_space.ndim, mode=EmbeddingMode.TILE),
     )
 
 
@@ -124,7 +135,7 @@ def relu_op(
 
     return op.bind_result(
         name="result",
-        selector=selector,
+        selector=selector.embed(op.index_space.ndim, mode=EmbeddingMode.TILE),
     )
 
 

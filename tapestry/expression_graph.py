@@ -31,7 +31,7 @@ from tapestry import zspace
 from tapestry.numpy_utils import as_zarray
 from tapestry.serialization.json_serializable import JsonDumpable, JsonLoadable
 from tapestry.type_utils import UUIDConvertable, coerce_optional_uuid, coerce_uuid
-from tapestry.zspace import BroadcastMode, ZRangeMap, ZTransform
+from tapestry.zspace import EmbeddingMode, ZRangeMap, ZTransform
 
 NODE_TYPE_FIELD = "__type__"
 EDGES_FIELD = "__edges__"
@@ -787,7 +787,6 @@ class BlockOperation(TapestryNode):
         value: NodeIdCoercible,
         projection,
         shape,
-        on_broadcast: BroadcastMode = BroadcastMode.BROADCAST,
     ) -> Input:
         shape = as_zarray(shape)
 
@@ -797,8 +796,7 @@ class BlockOperation(TapestryNode):
             selector=ZRangeMap(
                 transform=ZTransform(
                     projection=projection,
-                    on_broadcast=on_broadcast,
-                ),
+                ).embed(self.index_space.ndim, mode=EmbeddingMode.TILE),
                 shape=shape,
             ),
         )
