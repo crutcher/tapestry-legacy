@@ -653,10 +653,11 @@ class BlockOperation(TapestryNode):
                 result_range = self.selector(op.index_space)
             except ValueError as e:
                 raise AssertionError(
-                    f"{self.node_type()} Selector incompatible with index_space:\n"
+                    f"{op.name} :: {self.node_type()}[{self.name}] Selector incompatible with index_space:\n"
                     f"  Index Space: {repr(op.index_space)}\n"
-                    f"  Selector: {repr(self.selector.transform)}\n\n"
-                    f"  {repr(self)}"
+                    f"{op.pretty(prefix='    > ')}\n"
+                    f"  Selector: {repr(self.selector.transform)}\n"
+                    f"{self.pretty(prefix='    > ')}"
                 ) from e
 
             if len(result_range.start) != len(tensor.shape):
@@ -754,49 +755,3 @@ class BlockOperation(TapestryNode):
 
         return value
 
-    def bind_fixed_input(
-        self,
-        *,
-        name: str,
-        value: NodeIdCoercible,
-    ) -> Input:
-        """
-        Construct a fixed Input binding to a value, and add it to the graph.
-
-        :param name: parameter name.
-        :param value: node id (or TensorValue node).
-        :return: the new input node.
-        """
-        graph = self.assert_graph()
-        value_id = coerce_node_id(value)
-        value_node = graph.get_node(value_id, TensorValue)
-
-        return self.bind_input(
-            name=name,
-            value=value,
-            selector=ZRangeMap.constant_map(
-                input_dim=self.index_space.ndim,
-                shape=value_node.shape,
-            ),
-        )
-
-    def bind_tiled_input(
-        self,
-        *,
-        name: str,
-        value: NodeIdCoercible,
-        projection,
-        shape,
-    ) -> Input:
-        shape = as_zarray(shape)
-
-        return self.bind_input(
-            name=name,
-            value=value,
-            selector=ZRangeMap(
-                transform=ZTransform(
-                    projection=projection,
-                ).embed(self.index_space.ndim, mode=EmbeddingMode.TILE),
-                shape=shape,
-            ),
-        )

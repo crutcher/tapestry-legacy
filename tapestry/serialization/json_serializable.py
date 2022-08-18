@@ -37,8 +37,10 @@ class JsonDumpable:
     def __str__(self):
         return self.dump_json_str()
 
-    def pretty(self):
-        return self.dump_json_str(indent=2)
+    def pretty(self, *, prefix=""):
+        return "\n".join(
+            prefix + line for line in self.dump_json_str(indent=2).splitlines()
+        )
 
 
 class JsonLoadable(JsonDumpable):

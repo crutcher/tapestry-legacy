@@ -62,7 +62,7 @@ def linear_op(
                 projection=[
                     [1, 0],
                     [0, 0],
-                    ],
+                ],
             ),
             shape=[1, in_dim],
         ).embed(op.index_space.ndim, mode=EmbeddingMode.TILE),
@@ -125,7 +125,10 @@ def relu_op(
         )
     )
 
-    selector = ZRangeMap.identity_map()
+    selector = ZRangeMap.identity_map().embed(
+        op.index_space.ndim,
+        mode=EmbeddingMode.TILE,
+    )
 
     op.bind_input(
         name="input",
@@ -135,7 +138,7 @@ def relu_op(
 
     return op.bind_result(
         name="result",
-        selector=selector.embed(op.index_space.ndim, mode=EmbeddingMode.TILE),
+        selector=selector,
     )
 
 
