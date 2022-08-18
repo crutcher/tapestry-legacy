@@ -13,14 +13,6 @@ from tapestry.expression_graph import (
 from tapestry.zspace import EmbeddingMode, ZRange, ZRangeMap, ZTransform, assert_shape
 
 
-def _name_and_shape(val: TensorValue):
-    s = "Tensor"
-    if val.name:
-        s += f"[{val.name}]"
-    s += f"{val.shape}"
-    return s
-
-
 def linear_op(
     *,
     x: TensorValue,
