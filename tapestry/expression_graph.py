@@ -28,10 +28,9 @@ import pydot
 import torch
 
 from tapestry import zspace
-from tapestry.numpy_utils import as_zarray
 from tapestry.serialization.json_serializable import JsonDumpable, JsonLoadable
 from tapestry.type_utils import UUIDConvertable, coerce_optional_uuid, coerce_uuid
-from tapestry.zspace import EmbeddingMode, ZRangeMap, ZTransform
+from tapestry.zspace import ZRangeMap
 
 NODE_TYPE_FIELD = "__type__"
 EDGES_FIELD = "__edges__"
@@ -159,9 +158,12 @@ class TapestryNode(JsonLoadable):
 @marshmallow_dataclass.add_schema
 @dataclass(kw_only=True)
 class TapestryEdge(TapestryNode):
-    class Constraint:
+    class EdgeMeta:
         SOURCE_TYPE: TapestryNode
         TARGET_TYPE: TapestryNode
+
+        INVERT_DEPENDENCY_FLOW: bool = False
+        DISPLAY_ATTRIBUTES: bool = True
 
     source_id: uuid.UUID
     target_id: uuid.UUID
@@ -203,7 +205,7 @@ class TapestryEdge(TapestryNode):
     @overrides
     def validate(self) -> None:
         super(TapestryEdge, self).validate()
-        hints = typing.get_type_hints(self.Constraint)
+        hints = typing.get_type_hints(self.EdgeMeta)
         assert isinstance(self.source(), hints["SOURCE_TYPE"]), hints
         assert isinstance(self.target(), hints["TARGET_TYPE"])
 
@@ -390,21 +392,36 @@ class TapestryGraph(JsonDumpable):
         del self.nodes[node.node_id]
 
     @overload
-    def list_nodes(self) -> List[TapestryNode]:
+    def list_nodes(
+        self,
+        *,
+        filter_types: Iterable[Type[TapestryNode]] = (TapestryEdge,),
+    ) -> List[TapestryNode]:
         ...
 
     @overload
-    def list_nodes(self, node_type: Type[_TapestryNodeT]) -> List[_TapestryNodeT]:
+    def list_nodes(
+        self,
+        node_type: Type[_TapestryNodeT],
+        *,
+        filter_types: Iterable[Type[TapestryNode]] = (TapestryEdge,),
+    ) -> List[_TapestryNodeT]:
         ...
 
     def list_nodes(
         self,
         node_type: Type[TapestryNode | _TapestryNodeT] = TapestryNode,
+        *,
+        filter_types: Iterable[Type[TapestryNode]] = (TapestryEdge,),
     ) -> Union[List[TapestryNode], List[_TapestryNodeT]]:
         """
         List all nodes which are subclasses of the given type.
 
+        By default, filters out all instances of TapestryEdge.
+
         :param node_type: the node wrapper type.
+        :param filter_types: Iterable of types (and sub-types) to exclude,
+            defaults to `(TapestryEdge,)`.
         :return: a list of nodes.
         """
         if not issubclass(node_type, TapestryNode):
@@ -415,6 +432,7 @@ class TapestryGraph(JsonDumpable):
             cast(_TapestryNodeT, node)
             for node in self.nodes.values()
             if isinstance(node, node_type)
+            if not isinstance(node, tuple(filter_types))
         ]
 
     @overload
@@ -544,6 +562,10 @@ class TapestryGraph(JsonDumpable):
         for node in self.nodes.values():
             node_type = type(node).node_type()
 
+            if isinstance(node, TapestryEdge):
+                if not node.EdgeMeta.DISPLAY_ATTRIBUTES:
+                    continue
+
             data = node.dump_json_data()
             is_edge = isinstance(node, TapestryEdge)
 
@@ -581,18 +603,54 @@ class TapestryGraph(JsonDumpable):
             )
 
         for node in self.nodes.values():
-            if isinstance(node, TapestryEdge):
+            if not isinstance(node, TapestryEdge):
+                continue
+
+            source = node.source_id
+            target = node.target_id
+
+            if node.EdgeMeta.INVERT_DEPENDENCY_FLOW:
+                source, target = target, source
+
+            if not node.EdgeMeta.DISPLAY_ATTRIBUTES:
+                # there's only this edge.
+
+                if node.EdgeMeta.INVERT_DEPENDENCY_FLOW:
+                    source_kwargs = dict(dir="back")
+                else:
+                    source_kwargs = dict()
+
                 dot.add_edge(
                     pydot.Edge(
-                        str(node.source_id),
+                        str(source),
+                        str(target),
+                        label=node.node_type(),
+                        **source_kwargs,
+                    ),
+                )
+
+            else:
+                # there's a dot-node for this edge.
+
+                if node.EdgeMeta.INVERT_DEPENDENCY_FLOW:
+                    source_kwargs = dict(dir="back")
+                    target_kwargs = dict(arrowhead="none")
+                else:
+                    source_kwargs = dict(arrowhead="none")
+                    target_kwargs = dict()
+
+                dot.add_edge(
+                    pydot.Edge(
+                        str(source),
                         str(node.node_id),
-                        arrowhead="none",
+                        **source_kwargs,
                     ),
                 )
                 dot.add_edge(
                     pydot.Edge(
                         str(node.node_id),
-                        str(node.target_id),
+                        str(target),
+                        **target_kwargs,
                     ),
                 )
 
@@ -633,66 +691,60 @@ class PinnedTensor(TensorValue):
     storage: str
 
 
+@dataclass(kw_only=True)
+class TensorBinding(TapestryEdge):
+    class EdgeMeta(TapestryEdge.EdgeMeta):
+        SOURCE_TYPE: "BlockOperation"
+        TARGET_TYPE: TensorValue
+
+    # force name to be required
+    name: str
+    selector: zspace.ZRangeMap
+
+    def __post_init__(self):
+        assert self.name
+
+    def validate(self) -> None:
+        op = self.source(BlockOperation)
+        tensor = self.target(TensorValue)
+
+        try:
+            result_range = self.selector(op.index_space)
+        except ValueError as e:
+            raise AssertionError(
+                f"{op.name} :: {self.node_type()}[{self.name}] Selector incompatible with index_space:\n"
+                f"  Index Space: {repr(op.index_space)}\n"
+                f"{op.pretty(prefix='    > ')}\n"
+                f"  Selector: {repr(self.selector.transform)}\n"
+                f"{self.pretty(prefix='    > ')}"
+            ) from e
+
+        if len(result_range.start) != len(tensor.shape):
+            raise AssertionError(
+                f"{self.node_type()} Selector Dimension Miss-match:\n"
+                f"  Index Space: {repr(op.index_space)}\n"
+                f"  Selector: {repr(self.selector.transform)}\n"
+                f"  Selected Space: {repr(result_range)}\n"
+                f"  Tensor: {tensor.shape}\n\n"
+                f"  {repr(self)}"
+            )
+
+
 @marshmallow_dataclass.add_schema
 @dataclass(kw_only=True)
 class BlockOperation(TapestryNode):
     index_space: zspace.ZRange
 
-    @dataclass(kw_only=True)
-    class TensorBinding(TapestryEdge):
-        # force name to be required
-        name: str
-        selector: zspace.ZRangeMap
-
-        def __post_init__(self):
-            assert self.name
-
-        def _validate(self, op: "BlockOperation", tensor: TensorValue):
-            # TODO: catch and decorate error
-            try:
-                result_range = self.selector(op.index_space)
-            except ValueError as e:
-                raise AssertionError(
-                    f"{op.name} :: {self.node_type()}[{self.name}] Selector incompatible with index_space:\n"
-                    f"  Index Space: {repr(op.index_space)}\n"
-                    f"{op.pretty(prefix='    > ')}\n"
-                    f"  Selector: {repr(self.selector.transform)}\n"
-                    f"{self.pretty(prefix='    > ')}"
-                ) from e
-
-            if len(result_range.start) != len(tensor.shape):
-                raise AssertionError(
-                    f"{self.node_type()} Selector Dimension Miss-match:\n"
-                    f"  Index Space: {repr(op.index_space)}\n"
-                    f"  Selector: {repr(self.selector.transform)}\n"
-                    f"  Selected Space: {repr(result_range)}\n"
-                    f"  Tensor: {tensor.shape}\n\n"
-                    f"  {repr(self)}"
-                )
-
     @marshmallow_dataclass.add_schema
     @dataclass(kw_only=True)
     class Input(TensorBinding):
-        class Constraint(TapestryEdge.Constraint):
-            SOURCE_TYPE: "BlockOperation"
-            TARGET_TYPE: TensorValue
-
-        def validate(self) -> None:
-            op = self.source(BlockOperation)
-            tensor = self.target(TensorValue)
-            self._validate(op, tensor)
+        pass
 
     @marshmallow_dataclass.add_schema
     @dataclass(kw_only=True)
     class Result(TensorBinding):
-        class Constraint(TapestryEdge.Constraint):
-            SOURCE_TYPE: TensorValue
-            TARGET_TYPE: "BlockOperation"
-
-        def validate(self) -> None:
-            tensor = self.source(TensorResult)
-            op = self.target(BlockOperation)
-            self._validate(op, tensor)
+        class EdgeMeta(TensorBinding.EdgeMeta):
+            INVERT_DEPENDENCY_FLOW = True
 
     def inputs(self) -> List[Input]:
         return self.assert_graph().list_edges(
@@ -746,12 +798,11 @@ class BlockOperation(TapestryNode):
 
         graph.add_node(
             BlockOperation.Result(
-                source_id=value.node_id,
-                target_id=self.node_id,
+                source_id=self.node_id,
+                target_id=value.node_id,
                 selector=selector,
                 name=name,
             ),
         )
 
         return value
-

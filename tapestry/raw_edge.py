@@ -165,6 +165,7 @@ def raw():
     )
 
     a = linear_op(x=x, w=w1, bias=b1)
+    return g
 
     y = relu_op(a)
 
