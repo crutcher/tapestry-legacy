@@ -13,5 +13,3 @@ virtualenv -p $PYTHON_VERSION --prompt "(venv)" venv
 
 source venv/bin/activate
 
-pip install pip-tools
-
