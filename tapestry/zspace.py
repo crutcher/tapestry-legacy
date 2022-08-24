@@ -207,6 +207,41 @@ class ZRange(FrozenDoc):
 
         return corners
 
+    def split(self, *, axis: int, sections: int) -> List["ZRange"]:
+        shape = self.shape
+        axis_size = shape[axis]
+        if sections > axis_size:
+            raise AssertionError(
+                f"Cannot split {shape}[{axis}] ({axis_size}) into ({sections}) non-zero sections."
+            )
+
+        step_size = axis_size / sections
+
+        chunk_step = np.zeros(self.ndim, dtype=int)
+        chunk_step[axis] = step_size
+
+        first_start = self.start
+
+        first_end = self.end.copy()
+        first_end[axis] = self.start[axis] + step_size
+
+        starts = [first_start]
+        ends = [first_end]
+
+        for idx in range(sections - 1):
+            starts.append(starts[-1] + chunk_step)
+            ends.append(ends[-1] + chunk_step)
+
+        ends[-1] = self.end
+
+        return [
+            ZRange(
+                start=start,
+                end=end,
+            )
+            for (start, end) in zip(starts, ends)
+        ]
+
 
 class EmbeddingMode(enum.Enum):
     CLIP = enum.auto()

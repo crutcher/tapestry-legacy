@@ -97,6 +97,14 @@ There are 4 primary components needed to demonstrate this:
 
 ### Related Work
 
+* *GSPMD* \
+  https://arxiv.org/abs/2105.04663 \
+  Solves the same design problem, via XLA IR rewrites. Uses in-flow shard directives on
+  input and output.
+* *MLIR* \
+  https://mlir.llvm.org \
+  ML Intermediate Representation for LLVM; uses "polyhedral" index types, like this project;
+  focuses on the single-machine GPU codegen problem.
 * *FAX* on *jax.pjit* \
   https://www.arxiv-vanity.com/papers/2204.06514/ \
   Appears to be pursuing similar slicing research, using *jax.pjit* as a backend.

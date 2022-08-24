@@ -143,6 +143,14 @@ def add_total_shards(g: TapestryGraph) -> None:
         op.add_shard(op.index_space)
 
 
+def shard_max_dim(g: TapestryGraph, shards: int) -> None:
+    for op in g.list_nodes(BlockOperation):
+        max_dim = int(op.index_space.shape.argmax())
+        k = int(min(shards, op.index_space.shape[max_dim]))
+        for part in op.index_space.split(axis=max_dim, sections=k):
+            op.add_shard(part)
+
+
 def build_example_graph():
     g = TapestryGraph()
 
@@ -195,7 +203,8 @@ def build_example_graph():
 
 def raw() -> TapestryGraph:
     g = build_example_graph()
-    add_total_shards(g)
+    shard_max_dim(g, 2)
+    # add_total_shards(g)
 
     g.validate()
     return g
