@@ -879,7 +879,7 @@ class BlockOperation(TapestryNode):
             TARGET_TYPE: "BlockOperation.Shard"
             INVERT_DEPENDENCY_FLOW = True
             DISPLAY_ATTRIBUTES = False
-            RELAX_EDGE = False
+            RELAX_EDGE = True
 
     @marshmallow_dataclass.add_schema
     @dataclass(kw_only=True)
