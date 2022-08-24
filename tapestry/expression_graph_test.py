@@ -64,29 +64,46 @@ class TapestryGraphTest(unittest.TestCase):
             ),
         )
 
-    def test_list_nodes_of_type(self) -> None:
+    def test_list_nodes_and_edges(self) -> None:
         g = TapestryGraph()
 
-        adoc = PinnedTensor(
-            node_id=uuid.uuid4(),
-            name="A",
-            shape=np.array([2, 3]),
-            dtype=torch.int64,
-            storage="pre:A",
+        a_value = g.add_node(
+            PinnedTensor(
+                node_id=uuid.uuid4(),
+                name="A",
+                shape=np.array([2, 3]),
+                dtype=torch.int64,
+                storage="pre:A",
+            ),
         )
-        g.add_node(adoc)
 
-        bdoc = TensorValue(
-            node_id=uuid.uuid4(),
-            shape=np.array([2, 3]),
-            dtype=torch.int64,
-            name="B",
+        b_value = g.add_node(
+            TensorValue(
+                node_id=uuid.uuid4(),
+                shape=np.array([2, 3]),
+                dtype=torch.int64,
+                name="B",
+            ),
         )
-        g.add_node(bdoc)
+
+        edge = g.add_node(
+            TapestryEdge(
+                source_id=a_value.node_id,
+                target_id=b_value.node_id,
+            ),
+        )
 
         eggs.assert_match(
+            g.list_edges(),
+            hamcrest.contains_exactly(
+                edge,
+            ),
+        )
+
+        # filtering out TapestryEdge:
+        eggs.assert_match(
             g.list_nodes(),
-            hamcrest.contains_inanyorder(
+            hamcrest.contains_exactly(
                 hamcrest.all_of(
                     hamcrest.instance_of(PinnedTensor),
                     hamcrest.has_property("name", "A"),
@@ -95,6 +112,30 @@ class TapestryGraphTest(unittest.TestCase):
                     hamcrest.instance_of(TensorValue),
                     hamcrest.instance_of(TapestryNode),
                     hamcrest.has_property("name", "B"),
+                ),
+            ),
+        )
+
+        # NOT filtering out:
+        eggs.assert_match(
+            g.list_nodes(filter_types=None),
+            hamcrest.contains_exactly(
+                hamcrest.all_of(
+                    hamcrest.instance_of(PinnedTensor),
+                    hamcrest.has_property("name", "A"),
+                    hamcrest.has_property("node_id", a_value.node_id),
+                ),
+                hamcrest.all_of(
+                    hamcrest.instance_of(TensorValue),
+                    hamcrest.instance_of(TapestryNode),
+                    hamcrest.has_property("name", "B"),
+                    hamcrest.has_property("node_id", b_value.node_id),
+                ),
+                hamcrest.all_of(
+                    hamcrest.instance_of(TapestryEdge),
+                    hamcrest.has_property("node_id", edge.node_id),
+                    hamcrest.has_property("source_id", a_value.node_id),
+                    hamcrest.has_property("target_id", b_value.node_id),
                 ),
             ),
         )

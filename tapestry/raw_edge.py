@@ -90,7 +90,7 @@ def linear_op(
             ).embed(op.index_space.ndim, mode=EmbeddingMode.CLIP),
         )
 
-    return op.bind_result(
+    result = op.bind_result(
         name="result",
         selector=ZRangeMap(
             transform=ZTransform(
@@ -99,6 +99,8 @@ def linear_op(
             shape=[1, 1],
         ).embed(op.index_space.ndim, mode=EmbeddingMode.TILE),
     )
+
+    return result
 
 
 def relu_op(
@@ -128,13 +130,20 @@ def relu_op(
         selector=selector,
     )
 
-    return op.bind_result(
+    result = op.bind_result(
         name="result",
         selector=selector,
     )
 
+    return result
 
-def raw():
+
+def add_total_shards(g: TapestryGraph) -> None:
+    for op in g.list_nodes(BlockOperation):
+        op.add_shard(op.index_space)
+
+
+def build_example_graph():
     g = TapestryGraph()
 
     x = g.add_node(
@@ -165,7 +174,6 @@ def raw():
     )
 
     a = linear_op(x=x, w=w1, bias=b1)
-    return g
 
     y = relu_op(a)
 
@@ -179,13 +187,17 @@ def raw():
     )
 
     z = relu_op(linear_op(x=y, w=w2))
-    print(z.pretty())
 
-    g.mark_observed(a)
     g.mark_observed(z)
 
-    g.validate()
+    return g
 
+
+def raw() -> TapestryGraph:
+    g = build_example_graph()
+    add_total_shards(g)
+
+    g.validate()
     return g
 
 

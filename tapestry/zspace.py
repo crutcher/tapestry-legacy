@@ -125,6 +125,26 @@ class ZRange(FrozenDoc):
             )
         )
 
+    def __contains__(self, item) -> bool:
+        if self.is_empty:
+            return False
+
+        if isinstance(item, ZRange):
+            if item.is_empty:
+                return False
+
+            return item.start in self and (item.end - 1) in self
+
+        try:
+            coords = as_zarray(item)
+        except ValueError:
+            return False
+
+        if coords.ndim != 1 or len(coords) != self.ndim:
+            return False
+
+        return bool((self.start <= coords).all() and (coords < self.end).all())
+
     def __lt__(self, other) -> bool:
         if not isinstance(other, ZRange):
             raise TypeError(f"Cannot compare ({type(self)}) and ({type(other)})")

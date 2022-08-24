@@ -1,3 +1,4 @@
+import contextlib
 import copy
 from dataclasses import dataclass, field
 import html
@@ -30,7 +31,7 @@ import torch
 from tapestry import zspace
 from tapestry.serialization.json_serializable import JsonDumpable, JsonLoadable
 from tapestry.type_utils import UUIDConvertable, coerce_optional_uuid, coerce_uuid
-from tapestry.zspace import ZRangeMap
+from tapestry.zspace import ZRange, ZRangeMap
 
 NODE_TYPE_FIELD = "__type__"
 EDGES_FIELD = "__edges__"
@@ -107,6 +108,9 @@ class TapestryNode(JsonLoadable):
     class Meta:
         exclude = ("_graph",)
 
+    class NodeMeta:
+        BG_COLOR: Optional[str] = None
+
     _graph: Any = None
 
     node_id: uuid.UUID = field(default_factory=uuid.uuid4)
@@ -165,6 +169,8 @@ class TapestryEdge(TapestryNode):
         INVERT_DEPENDENCY_FLOW: bool = False
         DISPLAY_ATTRIBUTES: bool = True
 
+        RELAX_EDGE: bool = False
+
     source_id: uuid.UUID
     target_id: uuid.UUID
 
@@ -216,8 +222,13 @@ class TapestryGraph(JsonDumpable):
     Serializable NodeAttributes graph.
     """
 
+    class Meta:
+        exclude = ("_validate_edits",)
+
     nodes: Dict[uuid.UUID, TapestryNode]
     observed: Set[uuid.UUID]
+
+    _validate_edits: bool = True
 
     @classmethod
     def build_load_schema(
@@ -321,6 +332,13 @@ class TapestryGraph(JsonDumpable):
         for node in self.nodes.values():
             node.validate()
 
+    @contextlib.contextmanager
+    def relax(self) -> typing.Iterator[None]:
+        val = self._validate_edits
+        self._validate_edits = False
+        yield
+        self._validate_edits = val
+
     def clone(self) -> "TapestryGraph":
         """
         Deep clone of a graph.
@@ -333,6 +351,55 @@ class TapestryGraph(JsonDumpable):
         for node_id in self.observed:
             g.mark_observed(node_id)
         return g
+
+    def add_node(self, node: _TapestryNodeT) -> _TapestryNodeT:
+        """
+        Add a node to the document.
+
+        EdgeAttributes nodes are validated that their `.source_id` and `.target_id`
+        appear in the graph, and are not edges.
+
+        :param node: the node.
+        """
+        if node.node_id in self.nodes:
+            raise ValueError(f"Node {node.node_id} already in graph.")
+
+        if isinstance(node, TapestryEdge):
+            for port in ("source_id", "target_id"):
+                port_id = getattr(node, port)
+                if port_id not in self.nodes:
+                    raise ValueError(
+                        f"Edge {port}({port_id}) not in graph:\n\n{repr(node)}",
+                    )
+
+                port_node = self.nodes[port_id]
+                if isinstance(port_node, TapestryEdge):
+                    raise ValueError(
+                        f"Edge {port}({port_id}) is an edge:\n\n{repr(node)}"
+                        f"\n\n ==[{port}]==>\n\n{repr(port_node)}",
+                    )
+
+        self.nodes[node.node_id] = node
+        node.graph = self
+
+        if self._validate_edits:
+            self.validate()
+
+        return node
+
+    def mark_observed(self, node: NodeIdCoercible) -> None:
+        node_id = coerce_node_id(node)
+        node = self.get_node(node_id)
+
+        if node_id not in self.nodes:
+            raise ValueError(
+                f"Can't observe a node not in the graph: {node}",
+            )
+        self.observed.add(node_id)
+
+    def clear_observed(self, node: NodeIdCoercible) -> None:
+        node_id = coerce_node_id(node)
+        self.observed.remove(node_id)
 
     @overload
     def get_node(
@@ -371,7 +438,8 @@ class TapestryGraph(JsonDumpable):
         node = self.nodes[node_id]
         if not isinstance(node, node_type):
             raise ValueError(
-                f"Node {node.node_id} is not of the expected type {node_type}:\n{node.pretty()}"
+                f"Node {node.node_id} is not of the expected type {node_type}:\n"
+                f"{node.pretty()}"
             )
         return cast(_TapestryNodeT, node)
 
@@ -391,11 +459,14 @@ class TapestryGraph(JsonDumpable):
         del node.graph
         del self.nodes[node.node_id]
 
+        if self._validate_edits:
+            self.validate()
+
     @overload
     def list_nodes(
         self,
         *,
-        filter_types: Iterable[Type[TapestryNode]] = (TapestryEdge,),
+        filter_types: Optional[Iterable[Type[TapestryNode]]] = (TapestryEdge,),
     ) -> List[TapestryNode]:
         ...
 
@@ -404,7 +475,7 @@ class TapestryGraph(JsonDumpable):
         self,
         node_type: Type[_TapestryNodeT],
         *,
-        filter_types: Iterable[Type[TapestryNode]] = (TapestryEdge,),
+        filter_types: Optional[Iterable[Type[TapestryNode]]] = (TapestryEdge,),
     ) -> List[_TapestryNodeT]:
         ...
 
@@ -412,7 +483,7 @@ class TapestryGraph(JsonDumpable):
         self,
         node_type: Type[TapestryNode | _TapestryNodeT] = TapestryNode,
         *,
-        filter_types: Iterable[Type[TapestryNode]] = (TapestryEdge,),
+        filter_types: Optional[Iterable[Type[TapestryNode]]] = (TapestryEdge,),
     ) -> Union[List[TapestryNode], List[_TapestryNodeT]]:
         """
         List all nodes which are subclasses of the given type.
@@ -428,11 +499,17 @@ class TapestryGraph(JsonDumpable):
             raise AssertionError(
                 f"Class {node_type} is not a subclass of {TapestryNode}"
             )
+
+        if filter_types:
+            filter_types = tuple(filter_types)
+        else:
+            filter_types = tuple()
+
         return [
             cast(_TapestryNodeT, node)
             for node in self.nodes.values()
             if isinstance(node, node_type)
-            if not isinstance(node, tuple(filter_types))
+            if not isinstance(node, filter_types)
         ]
 
     @overload
@@ -470,56 +547,35 @@ class TapestryGraph(JsonDumpable):
         target_id = coerce_optional_uuid(target_id)
         return [
             node
-            for node in self.list_nodes(edge_type)
+            for node in self.list_nodes(edge_type, filter_types=None)
             if source_id is None or node.source_id == source_id
             if target_id is None or node.target_id == target_id
         ]
 
-    def add_node(self, node: _TapestryNodeT) -> _TapestryNodeT:
-        """
-        Add a node to the document.
-
-        EdgeAttributes nodes are validated that their `.source_id` and `.target_id`
-        appear in the graph, and are not edges.
-
-        :param node: the node.
-        """
-        if node.node_id in self.nodes:
-            raise ValueError(f"Node {node.node_id} already in graph.")
-
-        if isinstance(node, TapestryEdge):
-            for port in ("source_id", "target_id"):
-                port_id = getattr(node, port)
-                if port_id not in self.nodes:
-                    raise ValueError(
-                        f"Edge {port}({port_id}) not in graph:\n\n{repr(node)}",
-                    )
-
-                port_node = self.nodes[port_id]
-                if isinstance(port_node, TapestryEdge):
-                    raise ValueError(
-                        f"Edge {port}({port_id}) is an edge:\n\n{repr(node)}"
-                        f"\n\n ==[{port}]==>\n\n{repr(port_node)}",
-                    )
-
-        self.nodes[node.node_id] = node
-        node.graph = self
-
-        return node
-
-    def mark_observed(self, node: NodeIdCoercible) -> None:
-        node_id = coerce_node_id(node)
-        node = self.get_node(node_id)
-
-        if node_id not in self.nodes:
+    def get_singular_edge(
+        self,
+        edge_type: Type[_TapestryEdgeT],
+        *,
+        source_id: UUIDConvertable = None,
+        target_id: UUIDConvertable = None,
+    ) -> _TapestryEdgeT:
+        edges = self.list_edges(
+            edge_type=edge_type,
+            source_id=source_id,
+            target_id=target_id,
+        )
+        if not edges:
             raise ValueError(
-                f"Can't observe a node not in the graph: {node}",
+                f"No matching edge {edge_type = }, {source_id =}, {target_id =}",
             )
-        self.observed.add(node_id)
 
-    def clear_observed(self, node: NodeIdCoercible) -> None:
-        node_id = coerce_node_id(node)
-        self.observed.remove(node_id)
+        if len(edges) > 1:
+            raise ValueError(
+                f"Multiple matching edges {edge_type = }, {source_id =}, {target_id =}:\n",
+                "\n".join((repr(e) for e in edges)),
+            )
+
+        return edges[0]
 
     def assert_node_types(
         self,
@@ -539,7 +595,11 @@ class TapestryGraph(JsonDumpable):
             names = ", ".join(sorted(cls.__name__ for cls in violations))
             raise ValueError(f"Illegal node types found: [{names}]")
 
-    def to_dot(self, *, omit_ids: bool = True) -> pydot.Dot:
+    def to_dot(
+        self,
+        *,
+        omit_ids: bool = True,
+    ) -> pydot.Dot:
         def format_data_table_row(data: dict) -> str:
             return "".join(
                 (
@@ -556,9 +616,21 @@ class TapestryGraph(JsonDumpable):
             else:
                 return html.escape(str(data))
 
+        def gensym(idx: int) -> str:
+            return hex(idx + 1)[2:].upper()
+
+        node_syms = {}
+        for node_idx, node in enumerate(self.list_nodes()):
+            node_sym = f"N{gensym(node_idx)}"
+            node_syms[node.node_id] = node_sym
+
+            for edge_idx, edge in enumerate(self.list_edges(source_id=node.node_id)):
+                edge_sym = f"{node_sym}.E{gensym(edge_idx)}"
+                node_syms[edge.node_id] = edge_sym
+
         dot = pydot.Dot("G", graph_type="digraph", bgcolor="red")
         dot.set_graph_defaults(bgcolor="white")
-        dot.set_graph_defaults(rankdir="RL")
+        dot.set_graph_defaults(rankdir="BT")
         for node in self.nodes.values():
             node_type = type(node).node_type()
 
@@ -580,12 +652,20 @@ class TapestryGraph(JsonDumpable):
             for k in null_keys:
                 del data[k]
 
-            title = node_type
+            title = f"{node_type}: {node_syms[node.node_id]}"
             if is_edge:
                 title = f"Edge: {title}"
 
+            table_attrs: Dict[str, Any] = dict(
+                border=0,
+                cellborder=1,
+                cellspacing=0,
+            )
+            if node.NodeMeta.BG_COLOR:
+                table_attrs["bgcolor"] = node.NodeMeta.BG_COLOR
+
             label = f"""
-                <table border="0" cellborder="1" cellspacing="0">
+                <table {' '.join((f'{k}="{v}"' for k,v in table_attrs.items()))}>
                   <tr><td colspan="2">{title}</td></tr>
                   {format_data_table_row(data)}
                   </table>
@@ -620,11 +700,16 @@ class TapestryGraph(JsonDumpable):
                 else:
                     source_kwargs = dict()
 
+                if node.EdgeMeta.RELAX_EDGE:
+                    source_kwargs["constraint"] = "false"
+
+                title = f"{node.node_type()}: {node_syms[node.node_id]}"
+
                 dot.add_edge(
                     pydot.Edge(
                         str(source),
                         str(target),
-                        label=node.node_type(),
+                        label=title,
                         **source_kwargs,
                     ),
                 )
@@ -638,6 +723,10 @@ class TapestryGraph(JsonDumpable):
                 else:
                     source_kwargs = dict(arrowhead="none")
                     target_kwargs = dict()
+
+                if node.EdgeMeta.RELAX_EDGE:
+                    source_kwargs["constraint"] = "false"
+                    target_kwargs["constraint"] = "false"
 
                 dot.add_edge(
                     pydot.Edge(
@@ -656,7 +745,11 @@ class TapestryGraph(JsonDumpable):
 
         if self.observed:
             dot.add_node(
-                pydot.Node("Observer"),
+                pydot.Node(
+                    "Observer",
+                    color="#E6B0AA",
+                    style="filled",
+                ),
             )
             for node_id in self.observed:
                 dot.add_edge(
@@ -672,6 +765,9 @@ class TapestryGraph(JsonDumpable):
 @marshmallow_dataclass.add_schema
 @dataclass(kw_only=True)
 class TensorValue(TapestryNode):
+    class NodeMeta(TapestryNode.NodeMeta):
+        BG_COLOR = "#F5EEf8"
+
     shape: zspace.ZArray
     dtype: DType
 
@@ -688,11 +784,14 @@ class TensorResult(TensorValue):
 @marshmallow_dataclass.add_schema
 @dataclass(kw_only=True)
 class PinnedTensor(TensorValue):
+    class NodeMeta(TapestryNode.NodeMeta):
+        BG_COLOR = "#C39BD3"
+
     storage: str
 
 
 @dataclass(kw_only=True)
-class TensorBinding(TapestryEdge):
+class BlockOpBindingEdgeBase(TapestryEdge):
     class EdgeMeta(TapestryEdge.EdgeMeta):
         SOURCE_TYPE: "BlockOperation"
         TARGET_TYPE: TensorValue
@@ -732,18 +831,69 @@ class TensorBinding(TapestryEdge):
 
 @marshmallow_dataclass.add_schema
 @dataclass(kw_only=True)
+class TensorIOBase(TapestryEdge):
+    class EdgeMeta(TapestryEdge.EdgeMeta):
+        TARGET_TYPE: TensorValue
+
+    slice: zspace.ZRange
+
+
+@marshmallow_dataclass.add_schema
+@dataclass(kw_only=True)
+class ReadSlice(TensorIOBase):
+    class NodeMeta(TapestryNode.NodeMeta):
+        BG_COLOR = "#E8F8F5"
+
+
+@marshmallow_dataclass.add_schema
+@dataclass(kw_only=True)
+class WriteSlice(TensorIOBase):
+    class NodeMeta(TapestryNode.NodeMeta):
+        BG_COLOR = "#F9EBEA"
+
+    class EdgeMeta(TensorIOBase.EdgeMeta):
+        INVERT_DEPENDENCY_FLOW = True
+
+
+@marshmallow_dataclass.add_schema
+@dataclass(kw_only=True)
 class BlockOperation(TapestryNode):
+    class NodeMeta(TapestryNode.NodeMeta):
+        BG_COLOR = "#A9CCE3"
+
     index_space: zspace.ZRange
 
     @marshmallow_dataclass.add_schema
     @dataclass(kw_only=True)
-    class Input(TensorBinding):
-        pass
+    class Shard(TapestryNode):
+        class NodeMeta(TapestryNode.NodeMeta):
+            BG_COLOR = "#EAF2F8"
+
+        index_slice: zspace.ZRange
 
     @marshmallow_dataclass.add_schema
     @dataclass(kw_only=True)
-    class Result(TensorBinding):
-        class EdgeMeta(TensorBinding.EdgeMeta):
+    class Partition(TapestryEdge):
+        class EdgeMeta(TapestryEdge.EdgeMeta):
+            SOURCE_TYPE: "BlockOperation"
+            TARGET_TYPE: "BlockOperation.Shard"
+            INVERT_DEPENDENCY_FLOW = True
+            DISPLAY_ATTRIBUTES = False
+            RELAX_EDGE = True
+
+    @marshmallow_dataclass.add_schema
+    @dataclass(kw_only=True)
+    class Input(BlockOpBindingEdgeBase):
+        class NodeMeta(TapestryNode.NodeMeta):
+            BG_COLOR = "#A3E4D7"
+
+    @marshmallow_dataclass.add_schema
+    @dataclass(kw_only=True)
+    class Result(BlockOpBindingEdgeBase):
+        class NodeMeta(TapestryNode.NodeMeta):
+            BG_COLOR = "#E6B0AA"
+
+        class EdgeMeta(BlockOpBindingEdgeBase.EdgeMeta):
             INVERT_DEPENDENCY_FLOW = True
 
     def inputs(self) -> List[Input]:
@@ -755,7 +905,7 @@ class BlockOperation(TapestryNode):
     def results(self) -> List[Result]:
         return self.assert_graph().list_edges(
             edge_type=BlockOperation.Result,
-            target_id=self.node_id,
+            source_id=self.node_id,
         )
 
     def bind_input(
@@ -806,3 +956,53 @@ class BlockOperation(TapestryNode):
         )
 
         return value
+
+    def add_shard(self, index_slice: ZRange) -> Shard:
+        graph = self.assert_graph()
+
+        if index_slice not in self.index_space:
+            raise AssertionError(
+                f"{index_slice = } does not fit in {self.index_space =}",
+            )
+
+        shard = graph.add_node(
+            BlockOperation.Shard(
+                index_slice=index_slice,
+            )
+        )
+
+        graph.add_node(
+            BlockOperation.Partition(
+                source_id=self.node_id,
+                target_id=shard.node_id,
+            )
+        )
+
+        for input_edge in self.inputs():
+            graph.add_node(
+                ReadSlice(
+                    source_id=shard.node_id,
+                    target_id=input_edge.target_id,
+                    slice=input_edge.selector(index_slice),
+                )
+            )
+
+        for result_edge in self.results():
+            graph.add_node(
+                WriteSlice(
+                    source_id=shard.node_id,
+                    target_id=result_edge.target_id,
+                    slice=result_edge.selector(index_slice),
+                )
+            )
+
+        return shard
+
+    def get_shards(self) -> List[Shard]:
+        return [
+            partition.target(BlockOperation.Shard)
+            for partition in self.assert_graph().list_edges(
+                edge_type=BlockOperation.Partition,
+                source_id=self.node_id,
+            )
+        ]

@@ -79,6 +79,21 @@ class ZRangeTest(unittest.TestCase):
             r"of dim \(1\), found \(0\)",
         )
 
+    def test_contains(self) -> None:
+        eggs.assert_true([0, 0] in ZRange([2, 3]))
+        eggs.assert_true([1, 2] in ZRange([2, 3]))
+
+        eggs.assert_false([-1, 0] in ZRange([2, 3]))
+        eggs.assert_false([2, 0] in ZRange([2, 3]))
+        eggs.assert_false([0, 3] in ZRange([2, 3]))
+
+        eggs.assert_false([0] in ZRange([2, 3]))
+        eggs.assert_false([0, 0, 0] in ZRange([2, 3]))
+
+        eggs.assert_false(ZRange([0, 0]) in ZRange([2, 3]))
+        eggs.assert_true(ZRange([1, 2]) in ZRange([2, 3]))
+        eggs.assert_true(ZRange(start=[1, 2], end=[2, 3]) in ZRange([2, 3]))
+
     def test_json(self):
         assert_json_serializable_roundtrip(
             ZRange(start=[1, 1], end=[2, 3]),
