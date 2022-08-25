@@ -111,6 +111,12 @@ class ZRange(FrozenDoc):
         if not np.all(self.end >= self.start):
             raise ValueError(f"start ({self.start}) is not >= end ({self.end})")
 
+    def __copy__(self) -> "ZRange":
+        return self
+
+    def __deepcopy__(self, memodict={}) -> "ZRange":
+        return self
+
     def __hash__(self) -> int:
         return ndarray_hash(self.start) ^ ndarray_hash(self.end)
 
@@ -338,6 +344,12 @@ class ZTransform(FrozenDoc):
                 f" != offset shape ({self.offset.shape[0]})"
             )
 
+    def __copy__(self) -> "ZTransform":
+        return self
+
+    def __deepcopy__(self, memodict={}) -> "ZTransform":
+        return self
+
     def __hash__(self) -> int:
         return ndarray_hash(self.projection) ^ ndarray_hash(self.offset)
 
@@ -494,6 +506,12 @@ class ZRangeMap(FrozenDoc):
             raise ValueError(
                 f"Coord index_map out ndim ({self.transform.out_dim}) != shape ndim ({self.shape.shape[0]})"
             )
+
+    def __copy__(self) -> "ZRangeMap":
+        return self
+
+    def __deepcopy__(self, memodict={}) -> "ZRangeMap":
+        return self
 
     def __hash__(self) -> int:
         return hash(self.transform) ^ ndarray_hash(self.shape)

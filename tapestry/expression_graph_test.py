@@ -250,16 +250,14 @@ class TapestryGraphTest(unittest.TestCase):
                 str(a.node_id): {
                     "__type__": "PinnedTensor",
                     **a.dump_json_data(),
-                    "__edges__": [
-                        {
-                            **edge_node.dump_json_data(),
-                            "__type__": "TapestryEdge",
-                        }
-                    ],
                 },
                 str(b.node_id): {
                     "__type__": "TensorValue",
                     **b.dump_json_data(),
+                },
+                str(edge_node.node_id): {
+                    **edge_node.dump_json_data(),
+                    "__type__": "TapestryEdge",
                 },
             },
         }
@@ -331,23 +329,11 @@ class TapestryGraphTest(unittest.TestCase):
         )
         g.add_node(edge_node)
 
-        illegal_source = TapestryEdge(
-            node_id=uuid.uuid4(),
-            name="illegal",
-            source_id=edge_node.node_id,
-            target_id=foo_node.node_id,
-        )
         missing_source = TapestryEdge(
             node_id=uuid.uuid4(),
             name="illegal",
             source_id=uuid.uuid4(),
             target_id=foo_node.node_id,
-        )
-        illegal_target = TapestryEdge(
-            node_id=uuid.uuid4(),
-            name="illegal",
-            source_id=foo_node.node_id,
-            target_id=edge_node.node_id,
         )
         missing_target = TapestryEdge(
             node_id=uuid.uuid4(),
@@ -356,7 +342,7 @@ class TapestryGraphTest(unittest.TestCase):
             target_id=uuid.uuid4(),
         )
 
-        for bad in (illegal_source, missing_source, illegal_target, missing_target):
+        for bad in (missing_source, missing_target):
             eggs.assert_raises(
                 lambda: g.add_node(bad),
                 ValueError,

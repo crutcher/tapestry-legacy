@@ -263,39 +263,6 @@ class TapestryGraph(JsonDumpable):
                 fields.Nested(N),
             )
 
-            @marshmallow.post_dump
-            def post_dump(self, data, **kwargs):
-                nodes = data["nodes"]
-                edges = [node for node in nodes.values() if "source_id" in node]
-                for edge in edges:
-                    del nodes[edge["node_id"]]
-
-                    source_node = nodes[edge["source_id"]]
-
-                    if EDGES_FIELD not in source_node:
-                        source_node[EDGES_FIELD] = []
-
-                    source_node[EDGES_FIELD].append(edge)
-
-                return data
-
-            @marshmallow.pre_load
-            def pre_load(self, data, **kwargs):
-                # don't mess with whatever the input source was.
-                data = copy.deepcopy(data)
-
-                nodes = data["nodes"]
-                edges = []
-                for node in nodes.values():
-                    if EDGES_FIELD in node:
-                        edges.extend(node[EDGES_FIELD])
-                        del node[EDGES_FIELD]
-
-                for edge in edges:
-                    nodes[edge["node_id"]] = edge
-
-                return data
-
             @marshmallow.post_load
             def post_load(self, data, **kwargs):
                 graph = TapestryGraph(**data)
@@ -372,13 +339,6 @@ class TapestryGraph(JsonDumpable):
                         f"Edge {port}({port_id}) not in graph:\n\n{repr(node)}",
                     )
 
-                port_node = self.nodes[port_id]
-                if isinstance(port_node, TapestryEdge):
-                    raise ValueError(
-                        f"Edge {port}({port_id}) is an edge:\n\n{repr(node)}"
-                        f"\n\n ==[{port}]==>\n\n{repr(port_node)}",
-                    )
-
         self.nodes[node.node_id] = node
         node.graph = self
 
@@ -443,7 +403,12 @@ class TapestryGraph(JsonDumpable):
             )
         return cast(_TapestryNodeT, node)
 
-    def remove_node(self, node: NodeIdCoercible) -> None:
+    def remove_node(
+        self,
+        node: NodeIdCoercible,
+        *,
+        remove_edges: bool = False,
+    ) -> None:
         """
         Remove a node from the graph.
 
@@ -455,6 +420,18 @@ class TapestryGraph(JsonDumpable):
 
         if node_id in self.observed:
             raise ValueError(f"Can't remove an observed node: {node_id}\n\n{node}")
+
+        edges = {e.node_id: e for e in self.list_edges(source_id=node_id)}
+        edges.update({e.node_id: e for e in self.list_edges(target_id=node_id)})
+        if edges:
+            if not remove_edges:
+                raise AssertionError(
+                    "Can't remove a node with live edges:\n"
+                    + "\n".join(repr(e) for e in edges.values())
+                )
+
+            for e in edges:
+                self.remove_node(e, remove_edges=True)
 
         del node.graph
         del self.nodes[node.node_id]
@@ -628,7 +605,14 @@ class TapestryGraph(JsonDumpable):
                 edge_sym = f"{node_sym}.E{gensym(edge_idx)}"
                 node_syms[edge.node_id] = edge_sym
 
+        for edge in self.list_edges():
+            if edge.node_id not in node_syms:
+                node_idx += 1
+                edge_sym = f"E{gensym(node_idx)}"
+                node_syms[edge.node_id] = edge_sym
+
         dot = pydot.Dot("G", graph_type="digraph", bgcolor="red")
+        dot.set_graph_defaults(nodesep=0.7)
         dot.set_graph_defaults(bgcolor="white")
         dot.set_graph_defaults(rankdir="BT")
         for node in self.nodes.values():
@@ -703,7 +687,8 @@ class TapestryGraph(JsonDumpable):
                 if node.EdgeMeta.RELAX_EDGE:
                     source_kwargs["constraint"] = "false"
 
-                title = f"{node.node_type()}: {node_syms[node.node_id]}"
+                # title = f"{node.node_type()}: {node_syms[node.node_id]}"
+                title = node.node_type()
 
                 dot.add_edge(
                     pydot.Edge(
@@ -719,9 +704,9 @@ class TapestryGraph(JsonDumpable):
 
                 if node.EdgeMeta.INVERT_DEPENDENCY_FLOW:
                     source_kwargs = dict(dir="back")
-                    target_kwargs = dict(arrowhead="none")
+                    target_kwargs = dict(arrowhead="crow")
                 else:
-                    source_kwargs = dict(arrowhead="none")
+                    source_kwargs = dict(arrowhead="crow")
                     target_kwargs = dict()
 
                 if node.EdgeMeta.RELAX_EDGE:
@@ -862,6 +847,7 @@ class BlockOperation(TapestryNode):
         BG_COLOR = "#A9CCE3"
 
     index_space: zspace.ZRange
+    name: str
 
     @marshmallow_dataclass.add_schema
     @dataclass(kw_only=True)
@@ -870,6 +856,16 @@ class BlockOperation(TapestryNode):
             BG_COLOR = "#EAF2F8"
 
         index_slice: zspace.ZRange
+        operation: str
+
+    @marshmallow_dataclass.add_schema
+    @dataclass(kw_only=True)
+    class Selection(TapestryEdge):
+        class EdgeMeta(TapestryEdge.EdgeMeta):
+            # SOURCE_TYPE: "BlockOperation.Partition"
+            # TARGET_TYPE: BlockOpBindingEdgeBase
+            DISPLAY_ATTRIBUTES = False
+            RELAX_EDGE = False
 
     @marshmallow_dataclass.add_schema
     @dataclass(kw_only=True)
@@ -879,7 +875,7 @@ class BlockOperation(TapestryNode):
             TARGET_TYPE: "BlockOperation.Shard"
             INVERT_DEPENDENCY_FLOW = True
             DISPLAY_ATTRIBUTES = False
-            RELAX_EDGE = True
+            RELAX_EDGE = False
 
     @marshmallow_dataclass.add_schema
     @dataclass(kw_only=True)
@@ -968,6 +964,7 @@ class BlockOperation(TapestryNode):
         shard = graph.add_node(
             BlockOperation.Shard(
                 index_slice=index_slice,
+                operation=self.name,
             )
         )
 
@@ -979,20 +976,34 @@ class BlockOperation(TapestryNode):
         )
 
         for input_edge in self.inputs():
-            graph.add_node(
+            read_edge = graph.add_node(
                 ReadSlice(
                     source_id=shard.node_id,
                     target_id=input_edge.target_id,
                     slice=input_edge.selector(index_slice),
+                    name=input_edge.name,
+                )
+            )
+            graph.add_node(
+                BlockOperation.Selection(
+                    source_id=read_edge.node_id,
+                    target_id=input_edge.node_id,
                 )
             )
 
         for result_edge in self.results():
-            graph.add_node(
+            write_edge = graph.add_node(
                 WriteSlice(
                     source_id=shard.node_id,
                     target_id=result_edge.target_id,
                     slice=result_edge.selector(index_slice),
+                    name=result_edge.name,
+                )
+            )
+            graph.add_node(
+                BlockOperation.Selection(
+                    source_id=write_edge.node_id,
+                    target_id=result_edge.node_id,
                 )
             )
 
