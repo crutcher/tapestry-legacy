@@ -847,7 +847,7 @@ class BlockOperation(TapestryNode):
         BG_COLOR = "#A9CCE3"
 
     index_space: zspace.ZRange
-    name: str
+    operation: str
 
     @marshmallow_dataclass.add_schema
     @dataclass(kw_only=True)
@@ -964,7 +964,8 @@ class BlockOperation(TapestryNode):
         shard = graph.add_node(
             BlockOperation.Shard(
                 index_slice=index_slice,
-                operation=self.name,
+                name=self.name,
+                operation=self.operation,
             )
         )
 
