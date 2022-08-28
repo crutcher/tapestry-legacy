@@ -6,11 +6,11 @@ import numpy as np
 import torch
 
 from tapestry.expression_graph import (
+    AggregateTensor,
     PinnedTensor,
     TapestryEdge,
     TapestryGraph,
     TapestryNode,
-    TensorResult,
     TensorValue,
 )
 from tapestry.testlib import eggs
@@ -305,7 +305,7 @@ class TapestryGraphTest(unittest.TestCase):
         eggs.assert_raises(
             lambda: g.assert_node_types(
                 [
-                    TensorResult,
+                    AggregateTensor,
                 ],
             ),
             ValueError,

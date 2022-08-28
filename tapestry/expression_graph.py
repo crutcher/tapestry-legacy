@@ -655,15 +655,15 @@ class TapestryGraph(JsonDumpable):
                   {format_data_table_row(data)}
                   </table>
             """
-            shape = "plain"
+            node_attrs = dict(shape="plain")
             if is_edge:
-                shape = "rectangle"
+                node_attrs["shape"] = "rectangle"
 
             dot.add_node(
                 pydot.Node(
                     str(node.node_id),
                     label=f"<{label}>",
-                    shape=shape,
+                    **node_attrs,
                 ),
             )
 
@@ -688,6 +688,9 @@ class TapestryGraph(JsonDumpable):
                 if node.EdgeControl.RELAX_EDGE:
                     source_kwargs["constraint"] = "false"
 
+                # distinguish no-attribute errors
+                source_kwargs["style"] = "dashed"
+
                 # title = f"{node.node_type()}: {node_syms[node.node_id]}"
                 title = node.node_type()
 
@@ -704,11 +707,24 @@ class TapestryGraph(JsonDumpable):
                 # there's a dot-node for this edge.
 
                 if node.EdgeControl.INVERT_DEPENDENCY_FLOW:
-                    source_kwargs = dict(dir="back")
-                    target_kwargs = dict(arrowhead="crow")
+                    source_kwargs = dict(
+                        dir="both",
+                        arrowtail="normal",
+                        arrowhead="odot",
+                    )
+                    target_kwargs = dict(
+                        dir="both",
+                        arrowtail="dot",
+                        arrowhead="none",
+                    )
                 else:
-                    source_kwargs = dict(arrowhead="crow")
-                    target_kwargs = dict()
+                    source_kwargs = dict(
+                        arrowhead="dot",
+                    )
+                    target_kwargs = dict(
+                        dir="both",
+                        arrowtail="odot",
+                    )
 
                 if node.EdgeControl.RELAX_EDGE:
                     source_kwargs["constraint"] = "false"
@@ -763,8 +779,36 @@ class TensorValue(TapestryNode):
 
 @marshmallow_dataclass.add_schema
 @dataclass(kw_only=True)
-class TensorResult(TensorValue):
-    pass
+class AggregateTensor(TensorValue):
+    @dataclass(kw_only=True)
+    class Aggregates(TapestryEdge):
+        class EdgeControl(TapestryEdge.EdgeControl):
+            SOURCE_TYPE: "AggregateTensor"
+            TARGET_TYPE: "TensorShard"
+            DISPLAY_ATTRIBUTES = False
+
+        class Meta(TapestryEdge.Meta):
+            ordered = True
+
+        def validate(self) -> None:
+            super().validate()
+            value = self.source(AggregateTensor)
+            shard = self.target(TensorShard)
+            if shard.slice not in ZRange(value.shape):
+                raise ValueError(f"{self.node_type()} shard ({shard}) ∉ value {value}")
+
+
+@marshmallow_dataclass.add_schema
+@dataclass(kw_only=True)
+class TensorShard(TensorValue):
+    slice: zspace.ZRange
+
+    def validate(self) -> None:
+        super().validate()
+        if self.slice not in ZRange(self.shape):
+            raise ValueError(
+                f"{self.node_type()} slice ({self.slice}) ∉ shape {self.shape}"
+            )
 
 
 @marshmallow_dataclass.add_schema
@@ -967,11 +1011,11 @@ class BlockOperation(TapestryNode):
         name: str,
         selector: ZRangeMap,
         dtype: torch.dtype = torch.float16,
-    ) -> TensorResult:
+    ) -> AggregateTensor:
         graph = self.assert_graph()
 
         value = graph.add_node(
-            TensorResult(
+            AggregateTensor(
                 name=name,
                 shape=selector(self.index_space).end,
                 dtype=dtype,
@@ -1031,18 +1075,34 @@ class BlockOperation(TapestryNode):
             )
 
         for result_edge in self.results():
+            result = result_edge.target(AggregateTensor)
+            slice = result_edge.selector(index_slice)
+            tensor_shard = graph.add_node(
+                TensorShard(
+                    name=result_edge.name,
+                    shape=result.shape,
+                    dtype=result.dtype,
+                    slice=slice,
+                )
+            )
             write_edge = graph.add_node(
                 WriteSlice(
-                    source_id=shard.node_id,
-                    target_id=result_edge.target_id,
-                    slice=result_edge.selector(index_slice),
                     name=result_edge.name,
+                    source_id=shard.node_id,
+                    target_id=tensor_shard.node_id,
+                    slice=slice,
                 )
             )
             graph.add_node(
                 BlockOperation.Selection(
                     source_id=write_edge.node_id,
                     target_id=result_edge.node_id,
+                )
+            )
+            graph.add_node(
+                AggregateTensor.Aggregates(
+                    source_id=result.node_id,
+                    target_id=tensor_shard.node_id,
                 )
             )
 
