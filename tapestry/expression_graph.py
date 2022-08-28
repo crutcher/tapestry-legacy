@@ -871,6 +871,15 @@ class BlockOperation(TapestryNode):
                 f"Compute costs must map to a 1-dim space: {repr(self.compute_cost)}",
             )
 
+        if not (self.memory_cost.marginal_strides() >= 1).all():
+            raise ValueError(
+                f"Marginal memory costs must be positive: {repr(self.memory_cost)}",
+            )
+        if not (self.compute_cost.marginal_strides() >= 1).all():
+            raise ValueError(
+                f"Marginal compute costs must be positive: {repr(self.compute_cost)}",
+            )
+
     @marshmallow_dataclass.add_schema
     @dataclass(kw_only=True)
     class Shard(TapestryNode):
