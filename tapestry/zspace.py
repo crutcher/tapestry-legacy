@@ -270,22 +270,22 @@ class ZTransform(FrozenDoc):
     @classmethod
     def identity_transform(
         cls,
-        n_dim: int,
+        dim: int = 1,
         *,
         offset=None,
     ) -> "ZTransform":
         """
         Construct an identity transform in the given dimensions.
 
-        :param n_dim: number of dimensions.
+        :param dim: number of dimensions.
         :param offset: (optional) offset, defaults to [0, ...].
         :return: a new ZTransform.
         """
         if offset is None:
-            offset = np.zeros(n_dim, dtype=int)
+            offset = np.zeros(dim, dtype=int)
 
         return ZTransform(
-            projection=np.identity(n_dim, dtype=int),
+            projection=np.identity(dim, dtype=int),
             offset=offset,
         )
 
@@ -367,7 +367,7 @@ class ZTransform(FrozenDoc):
     def embed(
         self,
         in_dim: int,
-        mode: EmbeddingMode,
+        mode: EmbeddingMode = EmbeddingMode.TILE,
     ) -> "ZTransform":
         """
         Create a new ZTransform by embedding this ZTransform in the target number of in_dims.

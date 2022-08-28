@@ -162,7 +162,7 @@ class TapestryNode(JsonLoadable):
 @marshmallow_dataclass.add_schema
 @dataclass(kw_only=True)
 class TapestryEdge(TapestryNode):
-    class EdgeMeta:
+    class EdgeControl:
         SOURCE_TYPE: TapestryNode
         TARGET_TYPE: TapestryNode
 
@@ -211,7 +211,7 @@ class TapestryEdge(TapestryNode):
     @overrides
     def validate(self) -> None:
         super(TapestryEdge, self).validate()
-        hints = typing.get_type_hints(self.EdgeMeta)
+        hints = typing.get_type_hints(self.EdgeControl)
         assert isinstance(self.source(), hints["SOURCE_TYPE"]), hints
         assert isinstance(self.target(), hints["TARGET_TYPE"])
 
@@ -619,10 +619,11 @@ class TapestryGraph(JsonDumpable):
             node_type = type(node).node_type()
 
             if isinstance(node, TapestryEdge):
-                if not node.EdgeMeta.DISPLAY_ATTRIBUTES:
+                if not node.EdgeControl.DISPLAY_ATTRIBUTES:
                     continue
 
             data = node.dump_json_data()
+
             is_edge = isinstance(node, TapestryEdge)
 
             if omit_ids:
@@ -673,18 +674,18 @@ class TapestryGraph(JsonDumpable):
             source = node.source_id
             target = node.target_id
 
-            if node.EdgeMeta.INVERT_DEPENDENCY_FLOW:
+            if node.EdgeControl.INVERT_DEPENDENCY_FLOW:
                 source, target = target, source
 
-            if not node.EdgeMeta.DISPLAY_ATTRIBUTES:
+            if not node.EdgeControl.DISPLAY_ATTRIBUTES:
                 # there's only this edge.
 
-                if node.EdgeMeta.INVERT_DEPENDENCY_FLOW:
+                if node.EdgeControl.INVERT_DEPENDENCY_FLOW:
                     source_kwargs = dict(dir="back")
                 else:
                     source_kwargs = dict()
 
-                if node.EdgeMeta.RELAX_EDGE:
+                if node.EdgeControl.RELAX_EDGE:
                     source_kwargs["constraint"] = "false"
 
                 # title = f"{node.node_type()}: {node_syms[node.node_id]}"
@@ -702,14 +703,14 @@ class TapestryGraph(JsonDumpable):
             else:
                 # there's a dot-node for this edge.
 
-                if node.EdgeMeta.INVERT_DEPENDENCY_FLOW:
+                if node.EdgeControl.INVERT_DEPENDENCY_FLOW:
                     source_kwargs = dict(dir="back")
                     target_kwargs = dict(arrowhead="crow")
                 else:
                     source_kwargs = dict(arrowhead="crow")
                     target_kwargs = dict()
 
-                if node.EdgeMeta.RELAX_EDGE:
+                if node.EdgeControl.RELAX_EDGE:
                     source_kwargs["constraint"] = "false"
                     target_kwargs["constraint"] = "false"
 
@@ -777,9 +778,12 @@ class PinnedTensor(TensorValue):
 
 @dataclass(kw_only=True)
 class BlockOpBindingEdgeBase(TapestryEdge):
-    class EdgeMeta(TapestryEdge.EdgeMeta):
+    class EdgeControl(TapestryEdge.EdgeControl):
         SOURCE_TYPE: "BlockOperation"
         TARGET_TYPE: TensorValue
+
+    class Meta(TapestryEdge.Meta):
+        ordered = True
 
     # force name to be required
     name: str
@@ -817,7 +821,7 @@ class BlockOpBindingEdgeBase(TapestryEdge):
 @marshmallow_dataclass.add_schema
 @dataclass(kw_only=True)
 class TensorIOBase(TapestryEdge):
-    class EdgeMeta(TapestryEdge.EdgeMeta):
+    class EdgeControl(TapestryEdge.EdgeControl):
         TARGET_TYPE: TensorValue
 
     slice: zspace.ZRange
@@ -836,7 +840,7 @@ class WriteSlice(TensorIOBase):
     class NodeMeta(TapestryNode.NodeMeta):
         BG_COLOR = "#F9EBEA"
 
-    class EdgeMeta(TensorIOBase.EdgeMeta):
+    class EdgeControl(TensorIOBase.EdgeControl):
         INVERT_DEPENDENCY_FLOW = True
 
 
@@ -846,8 +850,26 @@ class BlockOperation(TapestryNode):
     class NodeMeta(TapestryNode.NodeMeta):
         BG_COLOR = "#A9CCE3"
 
-    index_space: zspace.ZRange
+    class Meta(TapestryNode.Meta):
+        ordered = True
+
     operation: str
+    index_space: zspace.ZRange
+
+    # costs must map to dim-1
+    memory_cost: zspace.ZTransform
+    compute_cost: zspace.ZTransform
+
+    def validate(self) -> None:
+        super().validate()
+        if self.memory_cost.out_dim != 1:
+            raise ValueError(
+                f"Memory costs must map to a 1-dim space: {repr(self.memory_cost)}",
+            )
+        if self.compute_cost.out_dim != 1:
+            raise ValueError(
+                f"Compute costs must map to a 1-dim space: {repr(self.compute_cost)}",
+            )
 
     @marshmallow_dataclass.add_schema
     @dataclass(kw_only=True)
@@ -857,11 +879,16 @@ class BlockOperation(TapestryNode):
 
         index_slice: zspace.ZRange
         operation: str
+        memory_cost: int
+        compute_cost: int
+
+        class Meta(TapestryNode.Meta):
+            ordered = True
 
     @marshmallow_dataclass.add_schema
     @dataclass(kw_only=True)
     class Selection(TapestryEdge):
-        class EdgeMeta(TapestryEdge.EdgeMeta):
+        class EdgeControl(TapestryEdge.EdgeControl):
             # SOURCE_TYPE: "BlockOperation.Partition"
             # TARGET_TYPE: BlockOpBindingEdgeBase
             DISPLAY_ATTRIBUTES = False
@@ -870,7 +897,7 @@ class BlockOperation(TapestryNode):
     @marshmallow_dataclass.add_schema
     @dataclass(kw_only=True)
     class Partition(TapestryEdge):
-        class EdgeMeta(TapestryEdge.EdgeMeta):
+        class EdgeControl(TapestryEdge.EdgeControl):
             SOURCE_TYPE: "BlockOperation"
             TARGET_TYPE: "BlockOperation.Shard"
             INVERT_DEPENDENCY_FLOW = True
@@ -889,7 +916,7 @@ class BlockOperation(TapestryNode):
         class NodeMeta(TapestryNode.NodeMeta):
             BG_COLOR = "#E6B0AA"
 
-        class EdgeMeta(BlockOpBindingEdgeBase.EdgeMeta):
+        class EdgeControl(BlockOpBindingEdgeBase.EdgeControl):
             INVERT_DEPENDENCY_FLOW = True
 
     def inputs(self) -> List[Input]:
@@ -966,6 +993,8 @@ class BlockOperation(TapestryNode):
                 index_slice=index_slice,
                 name=self.name,
                 operation=self.operation,
+                compute_cost=self.compute_cost(index_slice.shape).item(),
+                memory_cost=self.memory_cost(index_slice.shape).item(),
             )
         )
 
