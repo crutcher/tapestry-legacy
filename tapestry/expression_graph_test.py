@@ -118,7 +118,7 @@ class TapestryGraphTest(unittest.TestCase):
 
         # NOT filtering out:
         eggs.assert_match(
-            g.list_nodes(filter_types=None),
+            g.list_nodes(exclude=None),
             hamcrest.contains_exactly(
                 hamcrest.all_of(
                     hamcrest.instance_of(PinnedTensor),

@@ -2,6 +2,7 @@ import contextlib
 import copy
 from dataclasses import dataclass, field
 import html
+import inspect
 import typing
 from typing import (
     Any,
@@ -10,6 +11,7 @@ from typing import (
     List,
     Optional,
     Set,
+    Tuple,
     Type,
     TypeVar,
     Union,
@@ -299,12 +301,17 @@ class TapestryGraph(JsonDumpable):
         for node in self.nodes.values():
             node.validate()
 
+    def validate_if_enabled(self) -> None:
+        if self._validate_edits:
+            self.validate()
+
     @contextlib.contextmanager
     def relax(self) -> typing.Iterator[None]:
         val = self._validate_edits
         self._validate_edits = False
         yield
         self._validate_edits = val
+        self.validate_if_enabled()
 
     def clone(self) -> "TapestryGraph":
         """
@@ -312,11 +319,18 @@ class TapestryGraph(JsonDumpable):
 
         :return: a new graph.
         """
+
+        # TODO: with graph edits, the node order might not be sufficient to load.
+        # Because we enforce "exists" for edges, and run validate on add,
+        # this will fail with some graph structures.
+        #
+        # doing something smarter should be fine.
         g = TapestryGraph()
-        for node in self.nodes.values():
-            g.add_node(node.clone())
-        for node_id in self.observed:
-            g.mark_observed(node_id)
+        with g.relax():
+            for node in self.nodes.values():
+                g.add_node(node.clone())
+            for node_id in self.observed:
+                g.mark_observed(node_id)
         return g
 
     def add_node(self, node: _TapestryNodeT) -> _TapestryNodeT:
@@ -331,7 +345,7 @@ class TapestryGraph(JsonDumpable):
         if node.node_id in self.nodes:
             raise ValueError(f"Node {node.node_id} already in graph.")
 
-        if isinstance(node, TapestryEdge):
+        if self._validate_edits and isinstance(node, TapestryEdge):
             for port in ("source_id", "target_id"):
                 port_id = getattr(node, port)
                 if port_id not in self.nodes:
@@ -342,8 +356,7 @@ class TapestryGraph(JsonDumpable):
         self.nodes[node.node_id] = node
         node.graph = self
 
-        if self._validate_edits:
-            self.validate()
+        self.validate_if_enabled()
 
         return node
 
@@ -443,7 +456,12 @@ class TapestryGraph(JsonDumpable):
     def list_nodes(
         self,
         *,
-        filter_types: Optional[Iterable[Type[TapestryNode]]] = (TapestryEdge,),
+        restrict: Optional[
+            Union[Type[TapestryNode], Iterable[Type[TapestryNode]]]
+        ] = None,
+        exclude: Optional[
+            Union[Type[TapestryNode], Iterable[Type[TapestryNode]]]
+        ] = TapestryEdge,
     ) -> List[TapestryNode]:
         ...
 
@@ -452,7 +470,12 @@ class TapestryGraph(JsonDumpable):
         self,
         node_type: Type[_TapestryNodeT],
         *,
-        filter_types: Optional[Iterable[Type[TapestryNode]]] = (TapestryEdge,),
+        restrict: Optional[
+            Union[Type[TapestryNode], Iterable[Type[TapestryNode]]]
+        ] = None,
+        exclude: Optional[
+            Union[Type[TapestryNode], Iterable[Type[TapestryNode]]]
+        ] = TapestryEdge,
     ) -> List[_TapestryNodeT]:
         ...
 
@@ -460,7 +483,12 @@ class TapestryGraph(JsonDumpable):
         self,
         node_type: Type[TapestryNode | _TapestryNodeT] = TapestryNode,
         *,
-        filter_types: Optional[Iterable[Type[TapestryNode]]] = (TapestryEdge,),
+        restrict: Optional[
+            Union[Type[TapestryNode], Iterable[Type[TapestryNode]]]
+        ] = None,
+        exclude: Optional[
+            Union[Type[TapestryNode], Iterable[Type[TapestryNode]]]
+        ] = TapestryEdge,
     ) -> Union[List[TapestryNode], List[_TapestryNodeT]]:
         """
         List all nodes which are subclasses of the given type.
@@ -468,7 +496,7 @@ class TapestryGraph(JsonDumpable):
         By default, filters out all instances of TapestryEdge.
 
         :param node_type: the node wrapper type.
-        :param filter_types: Iterable of types (and sub-types) to exclude,
+        :param exclude: Iterable of types (and sub-types) to exclude,
             defaults to `(TapestryEdge,)`.
         :return: a list of nodes.
         """
@@ -477,16 +505,37 @@ class TapestryGraph(JsonDumpable):
                 f"Class {node_type} is not a subclass of {TapestryNode}"
             )
 
-        if filter_types:
-            filter_types = tuple(filter_types)
-        else:
-            filter_types = tuple()
+        def clean_class_list_arg(val) -> Tuple[Type[TapestryNode], ...]:
+            if val is None:
+                return tuple()
+
+            if inspect.isclass(val):
+                return (val,)
+
+            else:
+                return tuple(val)
+
+        restrict = clean_class_list_arg(restrict)
+        exclude = clean_class_list_arg(exclude)
+
+        for t in restrict:
+            if not issubclass(t, node_type):
+                raise AssertionError(
+                    f"include type ({t}) is not a subclass of node_type: {node_type}"
+                )
+
+        if issubclass(node_type, exclude):
+            raise AssertionError(
+                f"node_type: ({node_type.__qualname__}) is a"
+                f" subclass of a filter_type: {exclude}"
+            )
 
         return [
             cast(_TapestryNodeT, node)
             for node in self.nodes.values()
             if isinstance(node, node_type)
-            if not isinstance(node, filter_types)
+            if (not restrict or isinstance(node, restrict))
+            if (not exclude or not isinstance(node, exclude))
         ]
 
     @overload
@@ -495,6 +544,12 @@ class TapestryGraph(JsonDumpable):
         *,
         source_id: UUIDConvertable = None,
         target_id: UUIDConvertable = None,
+        restrict: Optional[
+            Union[Type[TapestryNode], Iterable[Type[TapestryNode]]]
+        ] = None,
+        exclude: Optional[
+            Union[Type[TapestryNode], Iterable[Type[TapestryNode]]]
+        ] = None,
     ) -> List[TapestryEdge]:
         ...
 
@@ -505,6 +560,12 @@ class TapestryGraph(JsonDumpable):
         *,
         source_id: UUIDConvertable = None,
         target_id: UUIDConvertable = None,
+        restrict: Optional[
+            Union[Type[TapestryNode], Iterable[Type[TapestryNode]]]
+        ] = None,
+        exclude: Optional[
+            Union[Type[TapestryNode], Iterable[Type[TapestryNode]]]
+        ] = None,
     ) -> List[_TapestryEdgeT]:
         ...
 
@@ -514,6 +575,12 @@ class TapestryGraph(JsonDumpable):
         *,
         source_id: UUIDConvertable = None,
         target_id: UUIDConvertable = None,
+        restrict: Optional[
+            Union[Type[TapestryNode], Iterable[Type[TapestryNode]]]
+        ] = None,
+        exclude: Optional[
+            Union[Type[TapestryNode], Iterable[Type[TapestryNode]]]
+        ] = None,
     ) -> Union[List[TapestryEdge], List[_TapestryEdgeT]]:
         if not issubclass(edge_type, TapestryEdge):
             raise AssertionError(
@@ -524,7 +591,11 @@ class TapestryGraph(JsonDumpable):
         target_id = coerce_optional_uuid(target_id)
         return [
             node
-            for node in self.list_nodes(edge_type, filter_types=None)
+            for node in self.list_nodes(
+                edge_type,
+                restrict=restrict,
+                exclude=exclude,
+            )
             if source_id is None or node.source_id == source_id
             if target_id is None or node.target_id == target_id
         ]
@@ -779,12 +850,25 @@ class TensorValue(TapestryNode):
 
 @marshmallow_dataclass.add_schema
 @dataclass(kw_only=True)
+class TensorShard(TensorValue):
+    slice: zspace.ZRange
+
+    def validate(self) -> None:
+        super().validate()
+        if self.slice not in ZRange(self.shape):
+            raise ValueError(
+                f"{self.node_type()} slice ({self.slice}) ∉ shape {self.shape}"
+            )
+
+
+@marshmallow_dataclass.add_schema
+@dataclass(kw_only=True)
 class AggregateTensor(TensorValue):
     @dataclass(kw_only=True)
     class Aggregates(TapestryEdge):
         class EdgeControl(TapestryEdge.EdgeControl):
             SOURCE_TYPE: "AggregateTensor"
-            TARGET_TYPE: "TensorShard"
+            TARGET_TYPE: TensorShard
             DISPLAY_ATTRIBUTES = False
 
         class Meta(TapestryEdge.Meta):
@@ -797,18 +881,14 @@ class AggregateTensor(TensorValue):
             if shard.slice not in ZRange(value.shape):
                 raise ValueError(f"{self.node_type()} shard ({shard}) ∉ value {value}")
 
-
-@marshmallow_dataclass.add_schema
-@dataclass(kw_only=True)
-class TensorShard(TensorValue):
-    slice: zspace.ZRange
-
-    def validate(self) -> None:
-        super().validate()
-        if self.slice not in ZRange(self.shape):
-            raise ValueError(
-                f"{self.node_type()} slice ({self.slice}) ∉ shape {self.shape}"
+    def shards(self) -> List[TensorShard]:
+        return [
+            e.target(TensorShard)
+            for e in self.assert_graph().list_edges(
+                source_id=self.node_id,
+                edge_type=AggregateTensor.Aggregates,
             )
+        ]
 
 
 @marshmallow_dataclass.add_schema
