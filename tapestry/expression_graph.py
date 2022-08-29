@@ -659,7 +659,8 @@ class TapestryGraph(JsonDumpable):
 
         def format_data(data):
             if isinstance(data, dict):
-                return f"""<table border="0" cellborder="1" cellspacing="0">{format_data_table_row(data)}</table>"""
+                return '<table border="0" cellborder="1" cellspacing="0">' \
+                       f'{format_data_table_row(data)}</table>'
 
             else:
                 return html.escape(str(data))
@@ -752,9 +753,17 @@ class TapestryGraph(JsonDumpable):
                 # there's only this edge.
 
                 if node.EdgeControl.INVERT_DEPENDENCY_FLOW:
-                    source_kwargs = dict(dir="back")
+                    source_kwargs = dict(
+                        dir="both",
+                        arrowtail="normal",
+                        arrowhead="oinv",
+                    )
                 else:
-                    source_kwargs = dict()
+                    source_kwargs = dict(
+                        dir="both",
+                        arrowtail="oinv",
+                        arrowhead="normal",
+                    )
 
                 if node.EdgeControl.RELAX_EDGE:
                     source_kwargs["constraint"] = "false"
@@ -786,10 +795,12 @@ class TapestryGraph(JsonDumpable):
                     target_kwargs = dict(
                         dir="both",
                         arrowtail="dot",
-                        arrowhead="none",
+                        arrowhead="oinv",
                     )
                 else:
                     source_kwargs = dict(
+                        dir="both",
+                        arrowtail="oinv",
                         arrowhead="dot",
                     )
                     target_kwargs = dict(
