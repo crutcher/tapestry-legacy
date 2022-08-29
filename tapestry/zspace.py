@@ -1,6 +1,7 @@
 import enum
 import functools
-from typing import Iterable, List
+import math
+from typing import Iterable, List, Set, Tuple
 
 from marshmallow import fields
 from marshmallow_dataclass import NewType, dataclass
@@ -214,39 +215,67 @@ class ZRange(FrozenDoc):
         return corners
 
     def split(self, *, axis: int, sections: int) -> List["ZRange"]:
+        return self.multi_split((axis, sections))
+
+    def section(self, sections) -> List["ZRange"]:
+        return self.multi_split(*enumerate(as_zarray(sections)))
+
+    def multi_split(self, *axis_splits: Tuple[int, int]) -> List["ZRange"]:
+        """
+        Split a ZRange along multiple axes.
+
+        :param axis_splits: (axis, section) pairs
+        :return: a list of net ZRanges.
+        """
         shape = self.shape
-        axis_size = shape[axis]
-        if sections > axis_size:
-            raise AssertionError(
-                f"Cannot split {shape}[{axis}] ({axis_size}) into ({sections}) non-zero sections."
-            )
 
-        step_size = axis_size / sections
+        seen: Set[int] = set()
+        for axis, sections in axis_splits:
+            if sections < 1:
+                raise AssertionError(
+                    f"Illegal sectioning: occurs more than once: {axis_splits}"
+                )
 
-        chunk_step = np.zeros(self.ndim, dtype=int)
-        chunk_step[axis] = step_size
+            if sections == 1:
+                continue
 
-        first_start = self.start
+            if axis in seen:
+                raise AssertionError(f"axis occurs more than once: {axis_splits}")
 
-        first_end = self.end.copy()
-        first_end[axis] = self.start[axis] + step_size
+            axis_size = shape[axis]
+            if sections > axis_size:
+                raise AssertionError(
+                    f"Cannot split {shape}[{axis}] ({axis_size}) into ({sections}) non-zero sections."
+                )
 
-        starts = [first_start]
-        ends = [first_end]
+        parts = [self]
 
-        for idx in range(sections - 1):
-            starts.append(starts[-1] + chunk_step)
-            ends.append(ends[-1] + chunk_step)
+        for axis, sections in axis_splits:
+            axis_size = shape[axis]
+            step_size = math.ceil(float(axis_size) / sections)
 
-        ends[-1] = self.end
+            chunk_step = np.zeros(self.ndim, dtype=int)
+            chunk_step[axis] = step_size
 
-        return [
-            ZRange(
-                start=start,
-                end=end,
-            )
-            for (start, end) in zip(starts, ends)
-        ]
+            last_parts = parts
+            parts = []
+            for zr in last_parts:
+                end0 = zr.end.copy()
+                end0[axis] += step_size - axis_size
+
+                for idx in range(sections):
+                    offset = chunk_step * idx
+                    start = zr.start + offset
+                    end = np.minimum(end0 + offset, zr.end)
+
+                    parts.append(
+                        ZRange(
+                            start=start,
+                            end=end,
+                        )
+                    )
+
+        return parts
 
 
 class EmbeddingMode(enum.Enum):

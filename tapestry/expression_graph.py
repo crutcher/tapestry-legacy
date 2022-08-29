@@ -6,6 +6,7 @@ import inspect
 import typing
 from typing import (
     Any,
+    Callable,
     Dict,
     Iterable,
     List,
@@ -31,6 +32,7 @@ import pydot
 import torch
 
 from tapestry import zspace
+from tapestry.numpy_utils import as_zarray
 from tapestry.serialization.json_serializable import JsonDumpable, JsonLoadable
 from tapestry.type_utils import UUIDConvertable, coerce_optional_uuid, coerce_uuid
 from tapestry.zspace import ZRange, ZRangeMap
@@ -110,7 +112,7 @@ class TapestryNode(JsonLoadable):
     class Meta:
         exclude = ("_graph",)
 
-    class NodeMeta:
+    class NodeControl:
         BG_COLOR: Optional[str] = None
 
     _graph: Any = None
@@ -462,6 +464,7 @@ class TapestryGraph(JsonDumpable):
         exclude: Optional[
             Union[Type[TapestryNode], Iterable[Type[TapestryNode]]]
         ] = TapestryEdge,
+        filter: Optional[Callable[[TapestryNode], bool]] = None,
     ) -> List[TapestryNode]:
         ...
 
@@ -476,6 +479,7 @@ class TapestryGraph(JsonDumpable):
         exclude: Optional[
             Union[Type[TapestryNode], Iterable[Type[TapestryNode]]]
         ] = TapestryEdge,
+        filter: Optional[Callable[[TapestryNode], bool]] = None,
     ) -> List[_TapestryNodeT]:
         ...
 
@@ -489,6 +493,7 @@ class TapestryGraph(JsonDumpable):
         exclude: Optional[
             Union[Type[TapestryNode], Iterable[Type[TapestryNode]]]
         ] = TapestryEdge,
+        filter: Optional[Callable[[TapestryNode], bool]] = None,
     ) -> Union[List[TapestryNode], List[_TapestryNodeT]]:
         """
         List all nodes which are subclasses of the given type.
@@ -536,6 +541,7 @@ class TapestryGraph(JsonDumpable):
             if isinstance(node, node_type)
             if (not restrict or isinstance(node, restrict))
             if (not exclude or not isinstance(node, exclude))
+            if (not filter or filter(node))
         ]
 
     @overload
@@ -550,6 +556,7 @@ class TapestryGraph(JsonDumpable):
         exclude: Optional[
             Union[Type[TapestryNode], Iterable[Type[TapestryNode]]]
         ] = None,
+        filter: Optional[Callable[[TapestryNode], bool]] = None,
     ) -> List[TapestryEdge]:
         ...
 
@@ -566,6 +573,7 @@ class TapestryGraph(JsonDumpable):
         exclude: Optional[
             Union[Type[TapestryNode], Iterable[Type[TapestryNode]]]
         ] = None,
+        filter: Optional[Callable[[TapestryNode], bool]] = None,
     ) -> List[_TapestryEdgeT]:
         ...
 
@@ -581,6 +589,7 @@ class TapestryGraph(JsonDumpable):
         exclude: Optional[
             Union[Type[TapestryNode], Iterable[Type[TapestryNode]]]
         ] = None,
+        filter: Optional[Callable[[TapestryNode], bool]] = None,
     ) -> Union[List[TapestryEdge], List[_TapestryEdgeT]]:
         if not issubclass(edge_type, TapestryEdge):
             raise AssertionError(
@@ -595,6 +604,7 @@ class TapestryGraph(JsonDumpable):
                 edge_type,
                 restrict=restrict,
                 exclude=exclude,
+                filter=filter,
             )
             if source_id is None or node.source_id == source_id
             if target_id is None or node.target_id == target_id
@@ -659,8 +669,10 @@ class TapestryGraph(JsonDumpable):
 
         def format_data(data):
             if isinstance(data, dict):
-                return '<table border="0" cellborder="1" cellspacing="0">' \
-                       f'{format_data_table_row(data)}</table>'
+                return (
+                    '<table border="0" cellborder="1" cellspacing="0">'
+                    f"{format_data_table_row(data)}</table>"
+                )
 
             else:
                 return html.escape(str(data))
@@ -718,8 +730,8 @@ class TapestryGraph(JsonDumpable):
                 cellborder=1,
                 cellspacing=0,
             )
-            if node.NodeMeta.BG_COLOR:
-                table_attrs["bgcolor"] = node.NodeMeta.BG_COLOR
+            if node.NodeControl.BG_COLOR:
+                table_attrs["bgcolor"] = node.NodeControl.BG_COLOR
 
             label = f"""
                 <table {' '.join((f'{k}="{v}"' for k,v in table_attrs.items()))}>
@@ -849,7 +861,7 @@ class TapestryGraph(JsonDumpable):
 @marshmallow_dataclass.add_schema
 @dataclass(kw_only=True)
 class TensorValue(TapestryNode):
-    class NodeMeta(TapestryNode.NodeMeta):
+    class NodeControl(TapestryNode.NodeControl):
         BG_COLOR = "#F5EEf8"
 
     shape: zspace.ZArray
@@ -905,7 +917,7 @@ class AggregateTensor(TensorValue):
 @marshmallow_dataclass.add_schema
 @dataclass(kw_only=True)
 class PinnedTensor(TensorValue):
-    class NodeMeta(TapestryNode.NodeMeta):
+    class NodeControl(TapestryNode.NodeControl):
         BG_COLOR = "#C39BD3"
 
     storage: str
@@ -965,14 +977,14 @@ class TensorIOBase(TapestryEdge):
 @marshmallow_dataclass.add_schema
 @dataclass(kw_only=True)
 class ReadSlice(TensorIOBase):
-    class NodeMeta(TapestryNode.NodeMeta):
+    class NodeControl(TapestryNode.NodeControl):
         BG_COLOR = "#E8F8F5"
 
 
 @marshmallow_dataclass.add_schema
 @dataclass(kw_only=True)
 class WriteSlice(TensorIOBase):
-    class NodeMeta(TapestryNode.NodeMeta):
+    class NodeControl(TapestryNode.NodeControl):
         BG_COLOR = "#F9EBEA"
 
     class EdgeControl(TensorIOBase.EdgeControl):
@@ -982,7 +994,7 @@ class WriteSlice(TensorIOBase):
 @marshmallow_dataclass.add_schema
 @dataclass(kw_only=True)
 class BlockOperation(TapestryNode):
-    class NodeMeta(TapestryNode.NodeMeta):
+    class NodeControl(TapestryNode.NodeControl):
         BG_COLOR = "#A9CCE3"
 
     class Meta(TapestryNode.Meta):
@@ -1006,19 +1018,39 @@ class BlockOperation(TapestryNode):
                 f"Compute costs must map to a 1-dim space: {repr(self.compute_cost)}",
             )
 
-        if not (self.memory_cost.marginal_strides() >= 1).all():
+        if not (self.memory_cost.marginal_strides() >= 0).all():
             raise ValueError(
                 f"Marginal memory costs must be positive: {repr(self.memory_cost)}",
             )
-        if not (self.compute_cost.marginal_strides() >= 1).all():
+        if not (self.compute_cost.marginal_strides() >= 0).all():
             raise ValueError(
                 f"Marginal compute costs must be positive: {repr(self.compute_cost)}",
             )
 
+    # TODO: this kinda wants to be a "Tag"; which could be a base-class of TapestryEdge.
+    # A tag could easily have only a target (or only a source?)
+    @marshmallow_dataclass.add_schema
+    @dataclass(kw_only=True)
+    class SectionPlan(TapestryNode):
+        class Meta(TapestryEdge.Meta):
+            ordered = True
+
+        class NodeControl(TapestryNode.NodeControl):
+            BG_COLOR = "white"
+
+        sections: zspace.ZArray
+
+    @dataclass(kw_only=True)
+    class Sections(TapestryEdge):
+        class EdgeControl(TapestryEdge.EdgeControl):
+            SOURCE_TYPE: "BlockOperation.SectionPlan"
+            TARGET_TYPE: "BlockOperation"
+            DISPLAY_ATTRIBUTES = False
+
     @marshmallow_dataclass.add_schema
     @dataclass(kw_only=True)
     class Shard(TapestryNode):
-        class NodeMeta(TapestryNode.NodeMeta):
+        class NodeControl(TapestryNode.NodeControl):
             BG_COLOR = "#EAF2F8"
 
         index_slice: zspace.ZRange
@@ -1051,13 +1083,13 @@ class BlockOperation(TapestryNode):
     @marshmallow_dataclass.add_schema
     @dataclass(kw_only=True)
     class Input(BlockOpBindingEdgeBase):
-        class NodeMeta(TapestryNode.NodeMeta):
+        class NodeControl(TapestryNode.NodeControl):
             BG_COLOR = "#A3E4D7"
 
     @marshmallow_dataclass.add_schema
     @dataclass(kw_only=True)
     class Result(BlockOpBindingEdgeBase):
-        class NodeMeta(TapestryNode.NodeMeta):
+        class NodeControl(TapestryNode.NodeControl):
             BG_COLOR = "#E6B0AA"
 
         class EdgeControl(BlockOpBindingEdgeBase.EdgeControl):
@@ -1123,6 +1155,25 @@ class BlockOperation(TapestryNode):
         )
 
         return value
+
+    def attach_section_plan(self, sections) -> SectionPlan:
+        sections = as_zarray(sections)
+        g = self.assert_graph()
+
+        sp = g.add_node(
+            BlockOperation.SectionPlan(
+                sections=sections,
+            )
+        )
+
+        g.add_node(
+            BlockOperation.Sections(
+                source_id=sp.node_id,
+                target_id=self.node_id,
+            )
+        )
+
+        return sp
 
     def add_shard(self, index_slice: ZRange) -> Shard:
         graph = self.assert_graph()

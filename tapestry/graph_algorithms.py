@@ -1,3 +1,5 @@
+import numpy as np
+
 from tapestry.expression_graph import (
     AggregateTensor,
     BlockOperation,
@@ -12,17 +14,49 @@ def add_total_shards(g: TapestryGraph) -> None:
     for op in g.list_nodes(BlockOperation):
         op.add_shard(op.index_space)
 
-    g.validate()
+    g.validate_if_enabled()
+
+
+def section_plan_max_dim(g: TapestryGraph, shards: int) -> None:
+    planned_blocks = {e.target_id for e in g.list_edges(BlockOperation.Sections)}
+
+    for op in g.list_nodes(
+        BlockOperation,
+        filter=lambda n: n.node_id not in planned_blocks,
+    ):
+        max_dim = int(op.index_space.shape.argmax())
+        k = int(min(shards, op.index_space.shape[max_dim]))
+
+        sections = np.ones(op.index_space.ndim, dtype=int)
+        sections[max_dim] = k
+
+        op.attach_section_plan(sections)
+
+    g.validate_if_enabled()
+
+
+def expand_section_plans(g: TapestryGraph, remove: bool = True) -> None:
+    for section_plan in g.list_nodes(BlockOperation.SectionPlan):
+        for section_edge in g.list_edges(
+            BlockOperation.Sections,
+            source_id=section_plan.node_id,
+        ):
+            op = section_edge.target(BlockOperation)
+
+            for part in op.index_space.section(section_plan.sections):
+                op.add_shard(part)
+
+        if remove:
+            g.remove_node(section_plan, remove_edges=True)
+
+    g.validate_if_enabled()
 
 
 def shard_max_dim(g: TapestryGraph, shards: int) -> None:
-    for op in g.list_nodes(BlockOperation):
-        max_dim = int(op.index_space.shape.argmax())
-        k = int(min(shards, op.index_space.shape[max_dim]))
-        for part in op.index_space.split(axis=max_dim, sections=k):
-            op.add_shard(part)
+    section_plan_max_dim(g=g, shards=shards)
+    expand_section_plans(g, remove=True)
 
-    g.validate()
+    g.validate_if_enabled()
 
 
 def strip_blocks(g: TapestryGraph) -> None:
@@ -58,7 +92,8 @@ def strip_orphan_values(g: TapestryGraph) -> None:
                 continue
 
             if g.list_edges(
-                target_id=node_id, restrict=(ReadSlice, BlockOperation.Input)
+                target_id=node_id,
+                restrict=(ReadSlice, BlockOperation.Input),
             ):
                 continue
 
