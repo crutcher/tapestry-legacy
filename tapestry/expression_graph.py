@@ -971,6 +971,7 @@ class TensorIOBase(TapestryEdge):
     class EdgeControl(TapestryEdge.EdgeControl):
         TARGET_TYPE: TensorValue
 
+    name: str
     slice: zspace.ZRange
 
 
@@ -1050,6 +1051,9 @@ class BlockOperation(TapestryNode):
     @marshmallow_dataclass.add_schema
     @dataclass(kw_only=True)
     class Shard(TapestryNode):
+        class Meta(TapestryNode.Meta):
+            ordered = True
+
         class NodeControl(TapestryNode.NodeControl):
             BG_COLOR = "#EAF2F8"
 
@@ -1058,8 +1062,17 @@ class BlockOperation(TapestryNode):
         memory_cost: int
         compute_cost: int
 
-        class Meta(TapestryNode.Meta):
-            ordered = True
+        def inputs(self) -> List[ReadSlice]:
+            return self.assert_graph().list_edges(
+                edge_type=ReadSlice,
+                source_id=self.node_id,
+            )
+
+        def results(self) -> List[WriteSlice]:
+            return self.assert_graph().list_edges(
+                edge_type=WriteSlice,
+                source_id=self.node_id,
+            )
 
     @marshmallow_dataclass.add_schema
     @dataclass(kw_only=True)

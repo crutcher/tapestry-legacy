@@ -163,6 +163,19 @@ class ZRange(FrozenDoc):
             self.end, other.end
         )
 
+    def __sub__(self, other) -> "ZRange":
+        return self + (-as_zarray(other))
+
+    def __add__(self, other) -> "ZRange":
+        offset = as_zarray(other)
+        return ZRange(
+            start=self.start + offset,
+            end=self.end + offset,
+        )
+
+    def as_slice(self):
+        return tuple(slice(s, e) for s, e in zip(self.start, self.end))
+
     @functools.cached_property
     def ndim(self) -> int:
         "The number of dimensions of the ZSpace coordinate."

@@ -62,3 +62,6 @@ marshmallow-dataclass
 marshmallow-oneofschema
 marshmallow_enum
 
+# graph network stuff
+networkx
+
