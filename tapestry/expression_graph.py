@@ -360,13 +360,21 @@ class TapestryGraph(JsonDumpable):
         if node.node_id in self.nodes:
             raise ValueError(f"Node {node.node_id} already in graph.")
 
+        if self._validate_edits and isinstance(node, TapestryTag):
+            source_id = node.source_id
+            if source_id not in self.nodes:
+                raise ValueError(
+                    f"{node.__class__.__qualname__}.source_id({source_id}) "
+                    f"not in graph:\n\n{repr(node)}",
+                )
+
         if self._validate_edits and isinstance(node, TapestryEdge):
-            for port in ("source_id", "target_id"):
-                port_id = getattr(node, port)
-                if port_id not in self.nodes:
-                    raise ValueError(
-                        f"Edge {port}({port_id}) not in graph:\n\n{repr(node)}",
-                    )
+            target_id = node.target_id
+            if target_id not in self.nodes:
+                raise ValueError(
+                    f"{node.__class__.__qualname__}.target_id({target_id}) "
+                    f"not in graph:\n\n{repr(node)}",
+                )
 
         self.nodes[node.node_id] = node
         node.graph = self
@@ -511,11 +519,13 @@ class TapestryGraph(JsonDumpable):
         """
         List all nodes which are subclasses of the given type.
 
-        By default, filters out all instances of TapestryEdge.
+        By default, filters out all instances of TapestryTag
 
-        :param node_type: the node wrapper type.
+        :param node_type: the node type.
+        :param restrict: optional Iterable of types (and sub-types) to restrict to.
         :param exclude: Iterable of types (and sub-types) to exclude,
             defaults to `(TapestryEdge,)`.
+        :param filter: optional Callable, must return True to match.
         :return: a list of nodes.
         """
         if not issubclass(node_type, TapestryNode):
@@ -601,6 +611,19 @@ class TapestryGraph(JsonDumpable):
         ] = TapestryEdge,
         filter: Optional[Callable[[TapestryNode], bool]] = None,
     ) -> Union[List[TapestryTag], List[_TapestryTagT]]:
+        """
+        List all tags which are subclasses of the given type.
+
+        By default, filters out all instances of TapestryEdge.
+
+        :param tag_type: the tag class.
+        :param source_id: the source id (or node) to restrict to.
+        :param restrict: optional Iterable of types (and sub-types) to restrict to.
+        :param exclude: Iterable of types (and sub-types) to exclude,
+            defaults to `(TapestryEdge,)`.
+        :param filter: optional Callable, must return True to match.
+        :return: a list of tags.
+        """
         if not issubclass(tag_type, TapestryTag):
             raise AssertionError(f"Class {tag_type} is not a subclass of {TapestryTag}")
 
@@ -663,6 +686,20 @@ class TapestryGraph(JsonDumpable):
         ] = None,
         filter: Optional[Callable[[TapestryNode], bool]] = None,
     ) -> Union[List[TapestryEdge], List[_TapestryEdgeT]]:
+        """
+        List all tags which are subclasses of the given type.
+
+        By default, filters out all instances of TapestryEdge.
+
+        :param edge_type: the edge class.
+        :param source_id: the source id (or node) to restrict to.
+        :param target_id: the target id (or node) to restrict to.
+        :param restrict: optional Iterable of types (and sub-types) to restrict to.
+        :param exclude: Iterable of types (and sub-types) to exclude,
+            defaults to `(TapestryEdge,)`.
+        :param filter: optional Callable, must return True to match.
+        :return: a list of edges.
+        """
         if not issubclass(edge_type, TapestryEdge):
             raise AssertionError(
                 f"Class {edge_type} is not a subclass of {TapestryEdge}"

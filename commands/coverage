@@ -1,0 +1,11 @@
+#!/bin/bash
+
+source venv/bin/activate
+
+rm -f .coverage
+rm -rf htmlcov
+
+$GRIND test_nocheck --cov=tapestry
+
+coverage html
+

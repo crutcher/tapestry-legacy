@@ -16,6 +16,8 @@ logs/
 .testmondata
 
 .pytest_cache
+.coverage
+htmlcov
 
 # mypy artifacts
 /.mypy_cache

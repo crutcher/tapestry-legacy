@@ -11,6 +11,7 @@ from tapestry.expression_graph import (
     TapestryEdge,
     TapestryGraph,
     TapestryNode,
+    TapestryTag,
     TensorValue,
 )
 from tapestry.testlib import eggs
@@ -64,7 +65,7 @@ class TapestryGraphTest(unittest.TestCase):
             ),
         )
 
-    def test_list_nodes_and_edges(self) -> None:
+    def test_list_nodes_and_tags_and_edges(self) -> None:
         g = TapestryGraph()
 
         a_value = g.add_node(
@@ -83,6 +84,19 @@ class TapestryGraphTest(unittest.TestCase):
                 shape=np.array([2, 3]),
                 dtype=torch.int64,
                 name="B",
+            ),
+        )
+
+        tag = g.add_node(
+            TapestryTag(
+                source_id=a_value.node_id,
+            ),
+        )
+
+        eggs.assert_match(
+            g.list_tags(),
+            hamcrest.contains_exactly(
+                tag,
             ),
         )
 
@@ -130,6 +144,11 @@ class TapestryGraphTest(unittest.TestCase):
                     hamcrest.instance_of(TapestryNode),
                     hamcrest.has_property("name", "B"),
                     hamcrest.has_property("node_id", b_value.node_id),
+                ),
+                hamcrest.all_of(
+                    hamcrest.instance_of(TapestryTag),
+                    hamcrest.has_property("node_id", tag.node_id),
+                    hamcrest.has_property("source_id", a_value.node_id),
                 ),
                 hamcrest.all_of(
                     hamcrest.instance_of(TapestryEdge),

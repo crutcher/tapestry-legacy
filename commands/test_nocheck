@@ -4,3 +4,4 @@
 source venv/bin/activate
 
 pytest --suppress-no-test-exit-code "$@"
+
