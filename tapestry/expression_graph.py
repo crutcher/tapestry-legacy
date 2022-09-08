@@ -165,18 +165,11 @@ class TapestryNode(JsonLoadable):
 
 @marshmallow_dataclass.add_schema
 @dataclass(kw_only=True)
-class TapestryEdge(TapestryNode):
+class TapestryTag(TapestryNode):
     class EdgeControl:
         SOURCE_TYPE: TapestryNode
-        TARGET_TYPE: TapestryNode
-
-        INVERT_DEPENDENCY_FLOW: bool = False
-        DISPLAY_ATTRIBUTES: bool = True
-
-        RELAX_EDGE: bool = False
 
     source_id: uuid.UUID
-    target_id: uuid.UUID
 
     @overload
     def source(self) -> TapestryNode:
@@ -194,6 +187,26 @@ class TapestryEdge(TapestryNode):
         node_type: Type[TapestryNode | _TapestryNodeT] = TapestryNode,
     ) -> Union[TapestryNode, _TapestryNodeT]:
         return self.assert_graph().get_node(self.source_id, node_type)
+
+    @overrides
+    def validate(self) -> None:
+        super(TapestryTag, self).validate()
+        hints = typing.get_type_hints(self.EdgeControl)
+        assert isinstance(self.source(), hints["SOURCE_TYPE"]), hints
+
+
+@marshmallow_dataclass.add_schema
+@dataclass(kw_only=True)
+class TapestryEdge(TapestryTag):
+    class EdgeControl(TapestryTag.EdgeControl):
+        TARGET_TYPE: TapestryNode
+
+        INVERT_DEPENDENCY_FLOW: bool = False
+        DISPLAY_ATTRIBUTES: bool = True
+
+        RELAX_EDGE: bool = False
+
+    target_id: uuid.UUID
 
     @overload
     def target(self) -> TapestryNode:
@@ -216,8 +229,7 @@ class TapestryEdge(TapestryNode):
     def validate(self) -> None:
         super(TapestryEdge, self).validate()
         hints = typing.get_type_hints(self.EdgeControl)
-        assert isinstance(self.source(), hints["SOURCE_TYPE"]), hints
-        assert isinstance(self.target(), hints["TARGET_TYPE"])
+        assert isinstance(self.target(), hints["TARGET_TYPE"]), hints
 
 
 @dataclass
@@ -708,13 +720,16 @@ class TapestryGraph(JsonDumpable):
 
             data = node.dump_json_data()
 
+            is_tag = isinstance(node, TapestryTag)
             is_edge = isinstance(node, TapestryEdge)
 
             if omit_ids:
                 del data["node_id"]
 
-                if is_edge:
+                if is_tag:
                     del data["source_id"]
+
+                if is_edge:
                     del data["target_id"]
 
             null_keys = [k for k, v in data.items() if v is None]
@@ -722,6 +737,10 @@ class TapestryGraph(JsonDumpable):
                 del data[k]
 
             title = f"{node_type}: {node_syms[node.node_id]}"
+
+            if is_tag:
+                title = f"Tag: {title}"
+
             if is_edge:
                 title = f"Edge: {title}"
 
@@ -740,7 +759,7 @@ class TapestryGraph(JsonDumpable):
                   </table>
             """
             node_attrs = dict(shape="plain")
-            if is_edge:
+            if is_tag:
                 node_attrs["shape"] = "rectangle"
 
             dot.add_node(
