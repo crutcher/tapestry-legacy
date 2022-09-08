@@ -18,7 +18,7 @@ def add_total_shards(g: TapestryGraph) -> None:
 
 def section_plan_max_dim(g: TapestryGraph, shards: int) -> None:
     with g.relax():
-        planned_blocks = {e.target_id for e in g.list_edges(BlockOperation.Sections)}
+        planned_blocks = {e.source_id for e in g.list_tags(BlockOperation.SectionPlan)}
 
         for op in g.list_nodes(
             BlockOperation,
@@ -35,15 +35,11 @@ def section_plan_max_dim(g: TapestryGraph, shards: int) -> None:
 
 def expand_section_plans(g: TapestryGraph, remove: bool = True) -> None:
     with g.relax():
-        for section_plan in g.list_nodes(BlockOperation.SectionPlan):
-            for section_edge in g.list_edges(
-                BlockOperation.Sections,
-                source_id=section_plan.node_id,
-            ):
-                op = section_edge.target(BlockOperation)
+        for section_plan in g.list_tags(BlockOperation.SectionPlan):
+            op = section_plan.source(BlockOperation)
 
-                for part in op.index_space.section(section_plan.sections):
-                    op.add_shard(part)
+            for part in op.index_space.section(section_plan.sections):
+                op.add_shard(part)
 
             if remove:
                 g.remove_node(section_plan, remove_edges=True)

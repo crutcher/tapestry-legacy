@@ -42,6 +42,7 @@ EDGES_FIELD = "__edges__"
 
 
 _TapestryNodeT = TypeVar("_TapestryNodeT", bound="TapestryNode")
+_TapestryTagT = TypeVar("_TapestryTagT", bound="TapestryTag")
 _TapestryEdgeT = TypeVar("_TapestryEdgeT", bound="TapestryEdge")
 
 NodeIdCoercible = Union[UUIDConvertable, "TapestryNode"]
@@ -490,7 +491,7 @@ class TapestryGraph(JsonDumpable):
         ] = None,
         exclude: Optional[
             Union[Type[TapestryNode], Iterable[Type[TapestryNode]]]
-        ] = TapestryEdge,
+        ] = TapestryTag,
         filter: Optional[Callable[[TapestryNode], bool]] = None,
     ) -> List[_TapestryNodeT]:
         ...
@@ -504,7 +505,7 @@ class TapestryGraph(JsonDumpable):
         ] = None,
         exclude: Optional[
             Union[Type[TapestryNode], Iterable[Type[TapestryNode]]]
-        ] = TapestryEdge,
+        ] = TapestryTag,
         filter: Optional[Callable[[TapestryNode], bool]] = None,
     ) -> Union[List[TapestryNode], List[_TapestryNodeT]]:
         """
@@ -554,6 +555,65 @@ class TapestryGraph(JsonDumpable):
             if (not restrict or isinstance(node, restrict))
             if (not exclude or not isinstance(node, exclude))
             if (not filter or filter(node))
+        ]
+
+    @overload
+    def list_tags(
+        self,
+        *,
+        source_id: UUIDConvertable = None,
+        restrict: Optional[
+            Union[Type[TapestryNode], Iterable[Type[TapestryNode]]]
+        ] = None,
+        exclude: Optional[
+            Union[Type[TapestryNode], Iterable[Type[TapestryNode]]]
+        ] = TapestryEdge,
+        filter: Optional[Callable[[TapestryNode], bool]] = None,
+    ) -> List[TapestryEdge]:
+        ...
+
+    @overload
+    def list_tags(
+        self,
+        tag_type: Type[_TapestryTagT],
+        *,
+        source_id: UUIDConvertable = None,
+        restrict: Optional[
+            Union[Type[TapestryNode], Iterable[Type[TapestryNode]]]
+        ] = None,
+        exclude: Optional[
+            Union[Type[TapestryNode], Iterable[Type[TapestryNode]]]
+        ] = TapestryEdge,
+        filter: Optional[Callable[[TapestryNode], bool]] = None,
+    ) -> List[_TapestryTagT]:
+        ...
+
+    def list_tags(
+        self,
+        tag_type: Type[TapestryTag | _TapestryTagT] = TapestryTag,
+        *,
+        source_id: UUIDConvertable = None,
+        restrict: Optional[
+            Union[Type[TapestryNode], Iterable[Type[TapestryNode]]]
+        ] = None,
+        exclude: Optional[
+            Union[Type[TapestryNode], Iterable[Type[TapestryNode]]]
+        ] = TapestryEdge,
+        filter: Optional[Callable[[TapestryNode], bool]] = None,
+    ) -> Union[List[TapestryTag], List[_TapestryTagT]]:
+        if not issubclass(tag_type, TapestryTag):
+            raise AssertionError(f"Class {tag_type} is not a subclass of {TapestryTag}")
+
+        source_id = coerce_optional_uuid(source_id)
+        return [
+            node
+            for node in self.list_nodes(
+                tag_type,
+                restrict=restrict,
+                exclude=exclude,
+                filter=filter,
+            )
+            if source_id is None or node.source_id == source_id
         ]
 
     @overload
@@ -608,17 +668,17 @@ class TapestryGraph(JsonDumpable):
                 f"Class {edge_type} is not a subclass of {TapestryEdge}"
             )
 
-        source_id = coerce_optional_uuid(source_id)
         target_id = coerce_optional_uuid(target_id)
+
         return [
             node
-            for node in self.list_nodes(
-                edge_type,
+            for node in self.list_tags(
+                tag_type=edge_type,
+                source_id=source_id,
                 restrict=restrict,
                 exclude=exclude,
                 filter=filter,
             )
-            if source_id is None or node.source_id == source_id
             if target_id is None or node.target_id == target_id
         ]
 
@@ -697,9 +757,19 @@ class TapestryGraph(JsonDumpable):
             node_sym = f"N{gensym(node_idx)}"
             node_syms[node.node_id] = node_sym
 
+            for tag_idx, tag in enumerate(self.list_tags(source_id=node.node_id)):
+                tag_sym = f"{node_sym}.T{gensym(tag_idx)}"
+                node_syms[tag.node_id] = tag_sym
+
             for edge_idx, edge in enumerate(self.list_edges(source_id=node.node_id)):
                 edge_sym = f"{node_sym}.E{gensym(edge_idx)}"
                 node_syms[edge.node_id] = edge_sym
+
+        for tag in self.list_tags():
+            if tag.node_id not in node_syms:
+                node_idx += 1
+                tag_sym = f"E{gensym(node_idx)}"
+                node_syms[tag.node_id] = tag_sym
 
         for edge in self.list_edges():
             if edge.node_id not in node_syms:
@@ -770,20 +840,28 @@ class TapestryGraph(JsonDumpable):
                 ),
             )
 
-        for node in self.nodes.values():
-            if not isinstance(node, TapestryEdge):
-                continue
+        for tag in self.list_tags():
+            source = tag.source_id
 
-            source = node.source_id
-            target = node.target_id
+            dot.add_edge(
+                pydot.Edge(
+                    str(tag.node_id),
+                    str(tag.source_id),
+                ),
+            )
 
-            if node.EdgeControl.INVERT_DEPENDENCY_FLOW:
+        for edge in self.list_edges():
+
+            source = edge.source_id
+            target = edge.target_id
+
+            if edge.EdgeControl.INVERT_DEPENDENCY_FLOW:
                 source, target = target, source
 
-            if not node.EdgeControl.DISPLAY_ATTRIBUTES:
+            if not edge.EdgeControl.DISPLAY_ATTRIBUTES:
                 # there's only this edge.
 
-                if node.EdgeControl.INVERT_DEPENDENCY_FLOW:
+                if edge.EdgeControl.INVERT_DEPENDENCY_FLOW:
                     source_kwargs = dict(
                         dir="both",
                         arrowtail="normal",
@@ -796,14 +874,14 @@ class TapestryGraph(JsonDumpable):
                         arrowhead="normal",
                     )
 
-                if node.EdgeControl.RELAX_EDGE:
+                if edge.EdgeControl.RELAX_EDGE:
                     source_kwargs["constraint"] = "false"
 
                 # distinguish no-attribute errors
                 source_kwargs["style"] = "dashed"
 
-                # title = f"{node.node_type()}: {node_syms[node.node_id]}"
-                title = node.node_type()
+                # title = f"{edge.node_type()}: {node_syms[edge.node_id]}"
+                title = edge.node_type()
 
                 dot.add_edge(
                     pydot.Edge(
@@ -815,9 +893,9 @@ class TapestryGraph(JsonDumpable):
                 )
 
             else:
-                # there's a dot-node for this edge.
+                # there's a dot-edge for this edge.
 
-                if node.EdgeControl.INVERT_DEPENDENCY_FLOW:
+                if edge.EdgeControl.INVERT_DEPENDENCY_FLOW:
                     source_kwargs = dict(
                         dir="both",
                         arrowtail="normal",
@@ -839,20 +917,20 @@ class TapestryGraph(JsonDumpable):
                         arrowtail="odot",
                     )
 
-                if node.EdgeControl.RELAX_EDGE:
+                if edge.EdgeControl.RELAX_EDGE:
                     source_kwargs["constraint"] = "false"
                     target_kwargs["constraint"] = "false"
 
                 dot.add_edge(
                     pydot.Edge(
                         str(source),
-                        str(node.node_id),
+                        str(edge.node_id),
                         **source_kwargs,
                     ),
                 )
                 dot.add_edge(
                     pydot.Edge(
-                        str(node.node_id),
+                        str(edge.node_id),
                         str(target),
                         **target_kwargs,
                     ),
@@ -1047,25 +1125,19 @@ class BlockOperation(TapestryNode):
                 f"Marginal compute costs must be positive: {repr(self.compute_cost)}",
             )
 
-    # TODO: this kinda wants to be a "Tag"; which could be a base-class of TapestryEdge.
-    # A tag could easily have only a target (or only a source?)
     @marshmallow_dataclass.add_schema
     @dataclass(kw_only=True)
-    class SectionPlan(TapestryNode):
+    class SectionPlan(TapestryTag):
         class Meta(TapestryEdge.Meta):
             ordered = True
+
+        class EdgeControl(TapestryTag.EdgeControl):
+            SOURCE_TYPE: "BlockOperation"
 
         class NodeControl(TapestryNode.NodeControl):
             BG_COLOR = "white"
 
         sections: zspace.ZArray
-
-    @dataclass(kw_only=True)
-    class Sections(TapestryEdge):
-        class EdgeControl(TapestryEdge.EdgeControl):
-            SOURCE_TYPE: "BlockOperation.SectionPlan"
-            TARGET_TYPE: "BlockOperation"
-            DISPLAY_ATTRIBUTES = False
 
     @marshmallow_dataclass.add_schema
     @dataclass(kw_only=True)
@@ -1192,20 +1264,12 @@ class BlockOperation(TapestryNode):
         sections = as_zarray(sections)
         g = self.assert_graph()
 
-        sp = g.add_node(
+        return g.add_node(
             BlockOperation.SectionPlan(
                 sections=sections,
+                source_id=self.node_id,
             )
         )
-
-        g.add_node(
-            BlockOperation.Sections(
-                source_id=sp.node_id,
-                target_id=self.node_id,
-            )
-        )
-
-        return sp
 
     def add_shard(self, index_slice: ZRange) -> Shard:
         graph = self.assert_graph()
