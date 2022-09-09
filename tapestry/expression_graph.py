@@ -39,8 +39,6 @@ from tapestry.type_utils import UUIDConvertable, coerce_optional_uuid, coerce_uu
 from tapestry.zspace import ZRange, ZRangeMap
 
 NODE_TYPE_FIELD = "__type__"
-EDGES_FIELD = "__edges__"
-
 
 _TapestryNodeT = TypeVar("_TapestryNodeT", bound="TapestryNode")
 _TapestryTagT = TypeVar("_TapestryTagT", bound="TapestryTag")
