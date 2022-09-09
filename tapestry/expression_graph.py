@@ -17,6 +17,7 @@ from typing import (
     TypeVar,
     Union,
     cast,
+    final,
     overload,
 )
 import uuid
@@ -46,6 +47,13 @@ _TapestryTagT = TypeVar("_TapestryTagT", bound="TapestryTag")
 _TapestryEdgeT = TypeVar("_TapestryEdgeT", bound="TapestryEdge")
 
 NodeIdCoercible = Union[UUIDConvertable, "TapestryNode"]
+
+
+def call_subclass_methods_in_mro_order(inst, method: str, /, *args, **kwargs) -> None:
+    cls = inst.__class__
+    for base in inspect.getmro(cls):
+        if m := base.__dict__.get(method):
+            m.__get__(inst, cls)(*args, **kwargs)
 
 
 def coerce_node_id(val: NodeIdCoercible) -> uuid.UUID:
@@ -123,18 +131,31 @@ class TapestryNode(JsonLoadable):
 
     name: Optional[str] = None
 
+    @classmethod
+    def node_type(cls) -> str:
+        return cls.__qualname__
+
+    @final
     def validate(self) -> None:
+        """
+        Calls all :meth:`_validate()` calls in the subclass heirarchy.
+        """
+        call_subclass_methods_in_mro_order(self, "_validate")
+
+    def _validate(self) -> None:
+        """
+        Called by :meth:`.validate()`, can be overriden
+        without calling super().validate().
+        """
         self.assert_graph()
 
+    @final
     def clone(self: _TapestryNodeT) -> _TapestryNodeT:
         val = copy.deepcopy(self)
         del val.graph
         return val
 
-    @classmethod
-    def node_type(cls) -> str:
-        return cls.__qualname__
-
+    @final
     def assert_graph(self) -> "TapestryGraph":
         g = self.graph
         if g is None:
@@ -144,9 +165,9 @@ class TapestryNode(JsonLoadable):
     @property
     def graph(self) -> Optional["TapestryGraph"]:
         """
-        :return: the GraphDoc.
-        :raises ValueError: if the object is not attached to a GraphDoc.
-        :raises ReferenceError: if the attached GraphDoc is out of scope.
+        :return: the TapestryGraph.
+        :raises ValueError: if the object is not attached to a TapestryGraph.
+        :raises ReferenceError: if the attached TapestryGraph is out of scope.
         """
         if self._graph is None:
             return None
@@ -183,6 +204,7 @@ class TapestryTag(TapestryNode):
     ) -> _TapestryNodeT:
         ...
 
+    @final
     def source(
         self,
         node_type: Type[TapestryNode | _TapestryNodeT] = TapestryNode,
@@ -190,8 +212,7 @@ class TapestryTag(TapestryNode):
         return self.assert_graph().get_node(self.source_id, node_type)
 
     @overrides
-    def validate(self) -> None:
-        super(TapestryTag, self).validate()
+    def _validate(self) -> None:
         hints = typing.get_type_hints(self.EdgeControl)
         assert isinstance(self.source(), hints["SOURCE_TYPE"]), hints
 
@@ -220,6 +241,7 @@ class TapestryEdge(TapestryTag):
     ) -> _TapestryNodeT:
         ...
 
+    @final
     def target(
         self,
         node_type: Type[TapestryNode | _TapestryNodeT] = TapestryNode,
@@ -227,13 +249,13 @@ class TapestryEdge(TapestryTag):
         return self.assert_graph().get_node(self.target_id, node_type)
 
     @overrides
-    def validate(self) -> None:
-        super(TapestryEdge, self).validate()
+    def _validate(self) -> None:
         hints = typing.get_type_hints(self.EdgeControl)
         assert isinstance(self.target(), hints["TARGET_TYPE"]), hints
 
 
 @dataclass
+@final
 class TapestryGraph(JsonDumpable):
     """
     Serializable NodeAttributes graph.
@@ -749,7 +771,7 @@ class TapestryGraph(JsonDumpable):
         node_types: Iterable[Type[TapestryNode]],
     ) -> None:
         """
-        Assert that the GraphDoc contains only the listed types.
+        Assert that the TapestryGraph contains only the listed types.
 
         :param node_types: the node types.
         :raises ValueError: if there are type violations.
@@ -1010,8 +1032,8 @@ class TensorValue(TapestryNode):
 class TensorShard(TensorValue):
     slice: zspace.ZRange
 
-    def validate(self) -> None:
-        super().validate()
+    @overrides
+    def _validate(self) -> None:
         if self.slice not in ZRange(self.shape):
             raise ValueError(
                 f"{self.node_type()} slice ({self.slice}) ∉ shape {self.shape}"
@@ -1031,13 +1053,14 @@ class AggregateTensor(TensorValue):
         class Meta(TapestryEdge.Meta):
             ordered = True
 
-        def validate(self) -> None:
-            super().validate()
+        @overrides
+        def _validate(self) -> None:
             value = self.source(AggregateTensor)
             shard = self.target(TensorShard)
             if shard.slice not in ZRange(value.shape):
                 raise ValueError(f"{self.node_type()} shard ({shard}) ∉ value {value}")
 
+    @final
     def shards(self) -> List[TensorShard]:
         return [
             e.target(TensorShard)
@@ -1073,7 +1096,8 @@ class BlockOpBindingEdgeBase(TapestryEdge):
     def __post_init__(self):
         assert self.name
 
-    def validate(self) -> None:
+    @overrides
+    def _validate(self) -> None:
         op = self.source(BlockOperation)
         tensor = self.target(TensorValue)
 
@@ -1128,6 +1152,7 @@ class WriteSlice(TensorIOBase):
 
 @marshmallow_dataclass.add_schema
 @dataclass(kw_only=True)
+@final
 class BlockOperation(TapestryNode):
     class NodeControl(TapestryNode.NodeControl):
         BG_COLOR = "#A9CCE3"
@@ -1142,8 +1167,8 @@ class BlockOperation(TapestryNode):
     memory_cost: zspace.ZTransform
     compute_cost: zspace.ZTransform
 
-    def validate(self) -> None:
-        super().validate()
+    @overrides
+    def _validate(self) -> None:
         if self.memory_cost.out_dim != 1:
             raise ValueError(
                 f"Memory costs must map to a 1-dim space: {repr(self.memory_cost)}",
