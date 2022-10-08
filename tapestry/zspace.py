@@ -90,6 +90,13 @@ class ZRange(FrozenDoc):
         )
 
     def __init__(self, end, *, start=None):
+        if isinstance(end, ZRange):
+            assert start is None, start
+            with self._thaw_context():
+                self.start = end.start
+                self.end = end.end
+                return
+
         end = as_zarray(
             end,
             ndim=1,

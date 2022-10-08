@@ -35,7 +35,7 @@ import torch
 from tapestry import zspace
 from tapestry.numpy_utils import as_zarray
 from tapestry.serialization.json_serializable import JsonDumpable, JsonLoadable
-from tapestry.type_utils import UUIDConvertable, coerce_optional_uuid, coerce_uuid
+from tapestry.type_utils import UUIDConvertable, coerce_uuid, ensure_uuid
 from tapestry.zspace import ZRange, ZRangeMap
 
 NODE_TYPE_FIELD = "__type__"
@@ -55,6 +55,12 @@ def call_subclass_methods_in_mro_order(inst, method: str, /, *args, **kwargs) ->
 
 
 def coerce_node_id(val: NodeIdCoercible) -> uuid.UUID:
+    """
+    Coerce a convertable to a node id.
+
+    :param val: the value to coerce.
+    :return: the node id.
+    """
     if isinstance(val, TapestryNode):
         return val.node_id
     return coerce_uuid(val)
@@ -68,14 +74,32 @@ def coerce_optional_node_id(
     return coerce_node_id(val)
 
 
-def find_dtype(name: str) -> torch.dtype:
+def find_dtype(dtype: Union[torch.dtype, str]) -> torch.dtype:
+    """
+    Find the torch dtype matching the given name.
+
+    :param name: the name.
+    :return: a torch.dtype.
+    :raises AssertionError: if a dtype can't be found.
+    """
+    if isinstance(dtype, torch.dtype):
+        return dtype
+
+    if not isinstance(dtype, str):
+        raise AssertionError(f"Unknown lookup type: {dtype}, {type(dtype)}")
+
+    name: str = dtype
+
     if not name.startswith("torch."):
         raise AssertionError(f"Not a pytorch dtype: {name}")
 
     sname = name.removeprefix("torch.")
-    dtype = getattr(torch, sname)
-    assert isinstance(dtype, torch.dtype), f"{name} exists but is {type(dtype)}"
-    return dtype
+    try:
+        dtype = getattr(torch, sname)
+        assert isinstance(dtype, torch.dtype), f"{name} exists but is {type(dtype)}"
+        return dtype
+    except AttributeError as e:
+        raise AssertionError(f"No such dtype: {name}") from e
 
 
 class DTypeField(fields.Field):
@@ -123,11 +147,21 @@ class TapestryNode(JsonLoadable):
         BG_COLOR: Optional[str] = None
 
     _graph: Any = None
+    "This is really an Optional[ReferenceType[TapestryGraph]]"
 
     node_id: uuid.UUID = field(default_factory=uuid.uuid4)
     """Unique in a document."""
 
     name: Optional[str] = None
+
+    def __init__(
+        self,
+        *,
+        node_id: Optional[uuid.UUID] = None,
+        name: Optional[str] = None,
+    ):
+        self.node_id = ensure_uuid(node_id)
+        self.name = name
 
     @classmethod
     def node_type(cls) -> str:
@@ -191,6 +225,19 @@ class TapestryTag(TapestryNode):
 
     source_id: uuid.UUID
 
+    def __init__(
+        self,
+        *,
+        node_id: Optional[uuid.UUID] = None,
+        name: Optional[str] = None,
+        source_id: NodeIdCoercible,
+    ):
+        super(TapestryTag, self).__init__(
+            node_id=node_id,
+            name=name,
+        )
+        self.source_id = coerce_node_id(source_id)
+
     @overload
     def source(self) -> TapestryNode:
         ...
@@ -227,6 +274,21 @@ class TapestryEdge(TapestryTag):
         RELAX_EDGE: bool = False
 
     target_id: uuid.UUID
+
+    def __init__(
+        self,
+        *,
+        node_id: Optional[uuid.UUID] = None,
+        name: Optional[str] = None,
+        source_id: NodeIdCoercible,
+        target_id: NodeIdCoercible,
+    ):
+        super(TapestryEdge, self).__init__(
+            node_id=node_id,
+            name=name,
+            source_id=source_id,
+        )
+        self.target_id = coerce_node_id(target_id)
 
     @overload
     def target(self) -> TapestryNode:
@@ -591,7 +653,7 @@ class TapestryGraph(JsonDumpable):
     def list_tags(
         self,
         *,
-        source_id: UUIDConvertable = None,
+        source_id: Optional[NodeIdCoercible] = None,
         restrict: Optional[
             Union[Type[TapestryNode], Iterable[Type[TapestryNode]]]
         ] = None,
@@ -607,7 +669,7 @@ class TapestryGraph(JsonDumpable):
         self,
         tag_type: Type[_TapestryTagT],
         *,
-        source_id: UUIDConvertable = None,
+        source_id: Optional[NodeIdCoercible] = None,
         restrict: Optional[
             Union[Type[TapestryNode], Iterable[Type[TapestryNode]]]
         ] = None,
@@ -622,7 +684,7 @@ class TapestryGraph(JsonDumpable):
         self,
         tag_type: Type[TapestryTag | _TapestryTagT] = TapestryTag,
         *,
-        source_id: UUIDConvertable = None,
+        source_id: Optional[NodeIdCoercible] = None,
         restrict: Optional[
             Union[Type[TapestryNode], Iterable[Type[TapestryNode]]]
         ] = None,
@@ -647,7 +709,8 @@ class TapestryGraph(JsonDumpable):
         if not issubclass(tag_type, TapestryTag):
             raise AssertionError(f"Class {tag_type} is not a subclass of {TapestryTag}")
 
-        source_id = coerce_optional_uuid(source_id)
+        source_id = coerce_optional_node_id(source_id)
+
         return [
             node
             for node in self.list_nodes(
@@ -663,8 +726,8 @@ class TapestryGraph(JsonDumpable):
     def list_edges(
         self,
         *,
-        source_id: UUIDConvertable = None,
-        target_id: UUIDConvertable = None,
+        source_id: Optional[NodeIdCoercible] = None,
+        target_id: Optional[NodeIdCoercible] = None,
         restrict: Optional[
             Union[Type[TapestryNode], Iterable[Type[TapestryNode]]]
         ] = None,
@@ -680,8 +743,8 @@ class TapestryGraph(JsonDumpable):
         self,
         edge_type: Type[_TapestryEdgeT],
         *,
-        source_id: UUIDConvertable = None,
-        target_id: UUIDConvertable = None,
+        source_id: Optional[NodeIdCoercible] = None,
+        target_id: Optional[NodeIdCoercible] = None,
         restrict: Optional[
             Union[Type[TapestryNode], Iterable[Type[TapestryNode]]]
         ] = None,
@@ -696,8 +759,8 @@ class TapestryGraph(JsonDumpable):
         self,
         edge_type: Type[TapestryEdge | _TapestryEdgeT] = TapestryEdge,
         *,
-        source_id: UUIDConvertable = None,
-        target_id: UUIDConvertable = None,
+        source_id: Optional[NodeIdCoercible] = None,
+        target_id: Optional[NodeIdCoercible] = None,
         restrict: Optional[
             Union[Type[TapestryNode], Iterable[Type[TapestryNode]]]
         ] = None,
@@ -725,7 +788,7 @@ class TapestryGraph(JsonDumpable):
                 f"Class {edge_type} is not a subclass of {TapestryEdge}"
             )
 
-        target_id = coerce_optional_uuid(target_id)
+        target_id = coerce_optional_node_id(target_id)
 
         return [
             node
@@ -1021,14 +1084,43 @@ class TensorValue(TapestryNode):
     shape: zspace.ZArray
     dtype: DType
 
-    def __post_init__(self):
-        self.shape = zspace.as_zarray(self.shape)
+    def __init__(
+        self,
+        *,
+        node_id: Optional[uuid.UUID] = None,
+        name: Optional[str] = None,
+        shape,
+        dtype: Union[str, torch.dtype],
+    ):
+        super(TensorValue, self).__init__(
+            node_id=node_id,
+            name=name,
+        )
+        self.shape = zspace.as_zarray(shape)
+        self.dtype = find_dtype(dtype)
 
 
 @marshmallow_dataclass.add_schema
 @dataclass(kw_only=True)
 class TensorShard(TensorValue):
     slice: zspace.ZRange
+
+    def __init__(
+        self,
+        *,
+        node_id: Optional[uuid.UUID] = None,
+        name: Optional[str] = None,
+        shape,
+        dtype: Union[str, torch.dtype],
+        slice,
+    ):
+        super(TensorShard, self).__init__(
+            node_id=node_id,
+            name=name,
+            shape=shape,
+            dtype=dtype,
+        )
+        self.slice = zspace.ZRange(slice)
 
     @overrides
     def _validate(self) -> None:
@@ -1039,9 +1131,9 @@ class TensorShard(TensorValue):
 
 
 @marshmallow_dataclass.add_schema
-@dataclass(kw_only=True)
+@dataclass(kw_only=True, init=False)
 class AggregateTensor(TensorValue):
-    @dataclass(kw_only=True)
+    @dataclass(kw_only=True, init=False)
     class Aggregates(TapestryEdge):
         class EdgeControl(TapestryEdge.EdgeControl):
             SOURCE_TYPE: "AggregateTensor"
@@ -1077,6 +1169,23 @@ class PinnedTensor(TensorValue):
 
     storage: str
 
+    def __init__(
+        self,
+        *,
+        node_id: Optional[uuid.UUID] = None,
+        name: Optional[str] = None,
+        shape,
+        dtype: Union[str, torch.dtype],
+        storage: str,
+    ):
+        super(PinnedTensor, self).__init__(
+            node_id=node_id,
+            name=name,
+            shape=shape,
+            dtype=dtype,
+        )
+        self.storage = storage
+
 
 @dataclass(kw_only=True)
 class BlockOpBindingEdgeBase(TapestryEdge):
@@ -1091,7 +1200,22 @@ class BlockOpBindingEdgeBase(TapestryEdge):
     name: str
     selector: zspace.ZRangeMap
 
-    def __post_init__(self):
+    def __init__(
+        self,
+        *,
+        node_id: Optional[uuid.UUID] = None,
+        name: str,
+        source_id: NodeIdCoercible,
+        target_id: NodeIdCoercible,
+        selector: zspace.ZRangeMap,
+    ):
+        super(BlockOpBindingEdgeBase, self).__init__(
+            node_id=node_id,
+            name=name,
+            source_id=source_id,
+            target_id=target_id,
+        )
+        self.selector = selector
         assert self.name
 
     @overrides
@@ -1130,16 +1254,34 @@ class TensorIOBase(TapestryEdge):
     name: str
     slice: zspace.ZRange
 
+    def __init__(
+        self,
+        *,
+        node_id: Optional[uuid.UUID] = None,
+        name: str,
+        source_id: NodeIdCoercible,
+        target_id: NodeIdCoercible,
+        slice,
+    ):
+        super(TensorIOBase, self).__init__(
+            node_id=node_id,
+            name=name,
+            source_id=source_id,
+            target_id=target_id,
+        )
+        self.slice = zspace.ZRange(slice)
+        assert self.name
+
 
 @marshmallow_dataclass.add_schema
-@dataclass(kw_only=True)
+@dataclass(kw_only=True, init=False)
 class ReadSlice(TensorIOBase):
     class NodeControl(TapestryNode.NodeControl):
         BG_COLOR = "#E8F8F5"
 
 
 @marshmallow_dataclass.add_schema
-@dataclass(kw_only=True)
+@dataclass(kw_only=True, init=False)
 class WriteSlice(TensorIOBase):
     class NodeControl(TapestryNode.NodeControl):
         BG_COLOR = "#F9EBEA"
@@ -1164,6 +1306,26 @@ class BlockOperation(TapestryNode):
     # costs must map to dim-1
     memory_cost: zspace.ZTransform
     compute_cost: zspace.ZTransform
+
+    def __init__(
+        self,
+        *,
+        node_id: Optional[uuid.UUID] = None,
+        name: Optional[str] = None,
+        operation: str,
+        index_space,
+        memory_cost: zspace.ZTransform,
+        compute_cost: zspace.ZTransform,
+    ):
+        super(BlockOperation, self).__init__(
+            node_id=node_id,
+            name=name,
+        )
+        assert operation
+        self.operation = operation
+        self.index_space = zspace.ZRange(index_space)
+        self.memory_cost = memory_cost
+        self.compute_cost = compute_cost
 
     @overrides
     def _validate(self) -> None:
@@ -1199,6 +1361,19 @@ class BlockOperation(TapestryNode):
 
         sections: zspace.ZArray
 
+        def __init__(
+            self,
+            *,
+            node_id: Optional[uuid.UUID] = None,
+            source_id: NodeIdCoercible,
+            sections,
+        ):
+            super(BlockOperation.SectionPlan, self).__init__(
+                node_id=node_id,
+                source_id=source_id,
+            )
+            self.sections = zspace.as_zarray(sections)
+
     @marshmallow_dataclass.add_schema
     @dataclass(kw_only=True)
     class Shard(TapestryNode):
@@ -1213,6 +1388,25 @@ class BlockOperation(TapestryNode):
         memory_cost: int
         compute_cost: int
 
+        def __init__(
+            self,
+            *,
+            node_id: Optional[uuid.UUID] = None,
+            name: Optional[str] = None,
+            index_slice,
+            operation: str,
+            memory_cost: int,
+            compute_cost: int,
+        ):
+            super(BlockOperation.Shard, self).__init__(
+                node_id=node_id,
+                name=name,
+            )
+            self.index_slice = zspace.ZRange(index_slice)
+            self.operation = operation
+            self.memory_cost = memory_cost
+            self.compute_cost = compute_cost
+
         def inputs(self) -> List[ReadSlice]:
             return self.assert_graph().list_edges(
                 edge_type=ReadSlice,
@@ -1226,7 +1420,7 @@ class BlockOperation(TapestryNode):
             )
 
     @marshmallow_dataclass.add_schema
-    @dataclass(kw_only=True)
+    @dataclass(kw_only=True, init=False)
     class Selection(TapestryEdge):
         class EdgeControl(TapestryEdge.EdgeControl):
             # SOURCE_TYPE: "BlockOperation.Partition"
@@ -1235,7 +1429,7 @@ class BlockOperation(TapestryNode):
             RELAX_EDGE = False
 
     @marshmallow_dataclass.add_schema
-    @dataclass(kw_only=True)
+    @dataclass(kw_only=True, init=False)
     class Partition(TapestryEdge):
         class EdgeControl(TapestryEdge.EdgeControl):
             SOURCE_TYPE: "BlockOperation"
@@ -1245,13 +1439,13 @@ class BlockOperation(TapestryNode):
             RELAX_EDGE = False
 
     @marshmallow_dataclass.add_schema
-    @dataclass(kw_only=True)
+    @dataclass(kw_only=True, init=False)
     class Input(BlockOpBindingEdgeBase):
         class NodeControl(TapestryNode.NodeControl):
             BG_COLOR = "#A3E4D7"
 
     @marshmallow_dataclass.add_schema
-    @dataclass(kw_only=True)
+    @dataclass(kw_only=True, init=False)
     class Result(BlockOpBindingEdgeBase):
         class NodeControl(TapestryNode.NodeControl):
             BG_COLOR = "#E6B0AA"
@@ -1278,16 +1472,11 @@ class BlockOperation(TapestryNode):
         value: NodeIdCoercible,
         selector: ZRangeMap,
     ) -> Input:
-        graph = self.assert_graph()
-        value_id = coerce_node_id(value)
-
-        # TODO: verify this is legal.
-
-        return graph.add_node(
+        return self.assert_graph().add_node(
             BlockOperation.Input(
                 name=name,
-                source_id=self.node_id,
-                target_id=value_id,
+                source_id=self,
+                target_id=value,
                 selector=selector,
             )
         )
@@ -1311,8 +1500,8 @@ class BlockOperation(TapestryNode):
 
         graph.add_node(
             BlockOperation.Result(
-                source_id=self.node_id,
-                target_id=value.node_id,
+                source_id=self,
+                target_id=value,
                 selector=selector,
                 name=name,
             ),
@@ -1327,7 +1516,7 @@ class BlockOperation(TapestryNode):
         return g.add_node(
             BlockOperation.SectionPlan(
                 sections=sections,
-                source_id=self.node_id,
+                source_id=self,
             )
         )
 
@@ -1351,15 +1540,15 @@ class BlockOperation(TapestryNode):
 
         graph.add_node(
             BlockOperation.Partition(
-                source_id=self.node_id,
-                target_id=shard.node_id,
+                source_id=self,
+                target_id=shard,
             )
         )
 
         for input_edge in self.inputs():
             read_edge = graph.add_node(
                 ReadSlice(
-                    source_id=shard.node_id,
+                    source_id=shard,
                     target_id=input_edge.target_id,
                     slice=input_edge.selector(index_slice),
                     name=input_edge.name,
@@ -1367,8 +1556,8 @@ class BlockOperation(TapestryNode):
             )
             graph.add_node(
                 BlockOperation.Selection(
-                    source_id=read_edge.node_id,
-                    target_id=input_edge.node_id,
+                    source_id=read_edge,
+                    target_id=input_edge,
                 )
             )
 
@@ -1386,21 +1575,21 @@ class BlockOperation(TapestryNode):
             write_edge = graph.add_node(
                 WriteSlice(
                     name=result_edge.name,
-                    source_id=shard.node_id,
-                    target_id=tensor_shard.node_id,
+                    source_id=shard,
+                    target_id=tensor_shard,
                     slice=slice,
                 )
             )
             graph.add_node(
                 BlockOperation.Selection(
-                    source_id=write_edge.node_id,
-                    target_id=result_edge.node_id,
+                    source_id=write_edge,
+                    target_id=result_edge,
                 )
             )
             graph.add_node(
                 AggregateTensor.Aggregates(
-                    source_id=result.node_id,
-                    target_id=tensor_shard.node_id,
+                    source_id=result,
+                    target_id=tensor_shard,
                 )
             )
 
@@ -1411,6 +1600,6 @@ class BlockOperation(TapestryNode):
             partition.target(BlockOperation.Shard)
             for partition in self.assert_graph().list_edges(
                 edge_type=BlockOperation.Partition,
-                source_id=self.node_id,
+                source_id=self,
             )
         ]
