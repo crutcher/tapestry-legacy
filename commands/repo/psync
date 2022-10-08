@@ -2,14 +2,14 @@
 
 set -e
 
+source .venv/bin/activate
+
 pip install pip-tools
 
 if [ ! -f constraints.in ]; then
   echo generating empty 'constraints.in'
   touch constraints.in
 fi
-
-source .venv/bin/activate
 
 pip-compile
 
