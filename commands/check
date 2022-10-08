@@ -4,7 +4,7 @@ set -e
 
 cd $WORKSPACE_ROOT_DIR
 
-source venv/bin/activate
+source .venv/bin/activate
 
 if (( $# )) ; then
   TARGETS=( $@ )

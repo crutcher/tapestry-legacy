@@ -17,7 +17,7 @@
 export WORKSPACE_ROOT_DIR="$(cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd)"
 
 # Where do we keep the python venv?
-export WORKSPACE_VENV_DIR="$WORKSPACE_ROOT_DIR/venv"
+export WORKSPACE_VENV_DIR="$WORKSPACE_ROOT_DIR/.venv"
 
 # If we want to re-invoke this target; where is it?
 export GRIND="$WORKSPACE_ROOT_DIR/grind"

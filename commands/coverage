@@ -1,6 +1,6 @@
 #!/bin/bash
 
-source venv/bin/activate
+source .venv/bin/activate
 
 rm -f .coverage
 rm -rf htmlcov
