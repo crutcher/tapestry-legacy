@@ -1163,7 +1163,8 @@ class BlockOperation(TapestryNode):
 
     # costs must map to dim-1
     memory_cost: zspace.ZTransform
-    compute_cost: zspace.ZTransform
+    compute_width: zspace.ZTransform
+    compute_depth: int = 1
 
     @overrides
     def _validate(self) -> None:
@@ -1171,18 +1172,18 @@ class BlockOperation(TapestryNode):
             raise ValueError(
                 f"Memory costs must map to a 1-dim space: {repr(self.memory_cost)}",
             )
-        if self.compute_cost.out_dim != 1:
+        if self.compute_width.out_dim != 1:
             raise ValueError(
-                f"Compute costs must map to a 1-dim space: {repr(self.compute_cost)}",
+                f"Compute costs must map to a 1-dim space: {repr(self.compute_width)}",
             )
 
         if not (self.memory_cost.marginal_strides() >= 0).all():
             raise ValueError(
                 f"Marginal memory costs must be positive: {repr(self.memory_cost)}",
             )
-        if not (self.compute_cost.marginal_strides() >= 0).all():
+        if not (self.compute_width.marginal_strides() >= 0).all():
             raise ValueError(
-                f"Marginal compute costs must be positive: {repr(self.compute_cost)}",
+                f"Marginal compute costs must be positive: {repr(self.compute_width)}",
             )
 
     @marshmallow_dataclass.add_schema
@@ -1211,7 +1212,8 @@ class BlockOperation(TapestryNode):
         index_slice: zspace.ZRange
         operation: str
         memory_cost: int
-        compute_cost: int
+        compute_width: int
+        compute_depth: int
 
         def inputs(self) -> List[ReadSlice]:
             return self.assert_graph().list_edges(
@@ -1344,8 +1346,9 @@ class BlockOperation(TapestryNode):
                 index_slice=index_slice,
                 name=self.name,
                 operation=self.operation,
-                compute_cost=self.compute_cost(index_slice.shape).item(),
                 memory_cost=self.memory_cost(index_slice.shape).item(),
+                compute_width=self.compute_width(index_slice.shape).item(),
+                compute_depth=self.compute_depth,
             )
         )
 
