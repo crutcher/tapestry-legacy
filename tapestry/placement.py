@@ -1,3 +1,4 @@
+import math
 import uuid
 from dataclasses import dataclass
 from typing import Dict, Callable
@@ -19,6 +20,10 @@ class Placement:
     # mem
     # compute
 
+    compute_width: int
+    compute_delay: float
+
+
 
 class PlacementEnv:
     pass
@@ -37,6 +42,14 @@ def check_placement(
 
 def transit_size(shape: ZRange, dtype: torch.dtype, *, overhead: float = 0.05,) -> int:
     return int(dtype.__sizeof__() * shape.size * (1 + overhead))
+
+def resolve_tensor_storage(tensor_value: TensorValue) -> TensorValue:
+    # TensorValue
+    # TensorShard
+    # AggregateTensor
+    # PinnedTensor
+
+    return tensor_value
 
 def shard_compute_time(
         shard: BlockOperation.Shard,
@@ -60,16 +73,16 @@ def k(
     #   available needs.
 
     for shard in g.list_nodes(BlockOperation.Shard):
-        # shard_placement = ???
-        shard_placement: Placement
+        shard_placement = schedule[shard.node_id]
         check_placement(shard=shard, placement=shard_placement)
 
         read_times = []
 
         for read_slice in shard.inputs():
-            # slice_placement = ???
-            source_placement: Placement
-            read_source = read_slice.target(TensorValue)
+            # where is the real source?
+
+            read_source = resolve_tensor_storage(read_slice.target(TensorValue))
+            source_placement = schedule[read_source.node_id]
 
             if source_placement == shard_placement:
                 continue
@@ -93,6 +106,17 @@ def k(
             load_time = float(max(read_times))
         else:
             load_time = float(sum(read_times))
+
+        compute_depth = shard.compute_depth
+        if shard.compute_width > shard_placement.compute_width:
+            compute_depth *= math.ceil(shard.compute_width / shard_placement.compute_width)
+
+        compute_time = compute_depth * shard_placement.compute_delay
+
+        # not modeled at this point.
+        store_time = 0.0
+
+        shard_time = load_time + compute_time + store_time
 
         # compute time
         # compute width
