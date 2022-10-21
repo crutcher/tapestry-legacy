@@ -181,6 +181,35 @@ class ZRangeTest(unittest.TestCase):
             ),
         )
 
+    def test_intersection(self) -> None:
+        eggs.assert_match(
+            ZRange([0, 0, 0]).intersection(ZRange([0, 0, 0])),
+            ZRange([0, 0, 0]),
+        )
+
+        eggs.assert_match(
+            ZRange([3, 3, 3]).intersection(
+                ZRange(
+                    start=[1, 1, -1],
+                    end=[4, 2, 3],
+                ),
+            ),
+            ZRange(
+                start=[1, 1, 0],
+                end=[3, 2, 3],
+            ),
+        )
+
+        eggs.assert_match(
+            ZRange([3, 3, 3]).intersection(
+                ZRange(
+                    start=[4, 4, 4],
+                    end=[5, 7, 8],
+                ),
+            ),
+            ZRange([0, 0, 0]),
+        )
+
 
 class ZTransformTest(unittest.TestCase):
     def test_call(self):

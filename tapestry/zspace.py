@@ -6,6 +6,7 @@ from typing import Iterable, List, Set, Tuple
 from marshmallow import fields
 from marshmallow_dataclass import NewType, dataclass
 import numpy as np
+import numpy.ma
 
 from tapestry.numpy_utils import (
     as_zarray,
@@ -289,6 +290,27 @@ class ZRange(FrozenDoc):
                     )
 
         return parts
+
+    def intersection(self, val: "ZRange") -> "ZRange":
+        """
+        Compute the intersection of two ZRanges.
+
+        :param val: the other ZRange.
+        :return: intersecting range, or ZRange([0]*ndim).
+        :raises ValueError: on error.
+        """
+        if self.ndim != val.ndim:
+            raise ValueError(
+                f"Incompatible dimensions ({self.ndim} != {val.ndim})",
+            )
+
+        start = numpy.maximum(self.start, val.start)
+        end = numpy.minimum(self.end, val.end)
+
+        if (start >= end).any():
+            return ZRange([0] * self.ndim)
+
+        return ZRange(start=start, end=end)
 
 
 class EmbeddingMode(enum.Enum):
