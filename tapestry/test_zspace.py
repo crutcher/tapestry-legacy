@@ -203,6 +203,23 @@ class ZRangeTest(unittest.TestCase):
         eggs.assert_match(
             ZRange([3, 3, 3]).intersection(
                 ZRange(
+                    start=[1, 1, -1],
+                    end=[4, 2, 3],
+                ),
+                ZRange(
+                    start=[2, 1, -1],
+                    end=[5, 2, 3],
+                ),
+            ),
+            ZRange(
+                start=[2, 1, 0],
+                end=[3, 2, 3],
+            ),
+        )
+
+        eggs.assert_match(
+            ZRange([3, 3, 3]).intersection(
+                ZRange(
                     start=[4, 4, 4],
                     end=[5, 7, 8],
                 ),

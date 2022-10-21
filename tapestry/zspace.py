@@ -291,26 +291,39 @@ class ZRange(FrozenDoc):
 
         return parts
 
-    def intersection(self, val: "ZRange") -> "ZRange":
+    def intersection(self, *val: "ZRange") -> "ZRange":
         """
-        Compute the intersection of two ZRanges.
+        Compute the intersection of ZRanges.
 
         :param val: the other ZRange.
         :return: intersecting range, or ZRange([0]*ndim).
-        :raises ValueError: on error.
+        :raises ValueError: if the ndims don't match.
         """
-        if self.ndim != val.ndim:
-            raise ValueError(
-                f"Incompatible dimensions ({self.ndim} != {val.ndim})",
-            )
+        for v in val:
+            if self.ndim != v.ndim:
+                raise ValueError(
+                    f"Incompatible dimensions ({self.ndim} != {v.ndim})",
+                )
 
-        start = numpy.maximum(self.start, val.start)
-        end = numpy.minimum(self.end, val.end)
+        start = numpy.stack([self.start] + [v.start for v in val]).max(axis=0)
+        end = numpy.stack([self.end] + [v.end for v in val]).min(axis=0)
 
         if (start >= end).any():
             return ZRange([0] * self.ndim)
 
         return ZRange(start=start, end=end)
+
+    def overlaps(self, *val: "ZRange") -> bool:
+        """
+        Tests if ZRanges overlap.
+
+        Wrapper around .intersection()
+
+        :param val: ZRanges to compare to this one.
+        :return: True or False.
+        :raises ValueError: if the ndims don't match.
+        """
+        return self.intersection(*val).size != 0
 
 
 class EmbeddingMode(enum.Enum):
