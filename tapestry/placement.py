@@ -16,18 +16,13 @@ from tapestry.expression_graph import (
 )
 from tapestry.zspace import ZArray, ZRange
 
-# (TapestryGraph, { BlockOperation.Shard: Placement })
 
-# (Placement, Placement) => cost
+class PlacementConstraintError(Exception):
+    pass
 
 
 @dataclass
 class Placement:
-    pass
-    # id
-    # mem
-    # compute
-
     compute_width: int
     compute_delay: float
 
@@ -39,17 +34,6 @@ class Layout:
     def get_placement(self, node: NodeIdCoercible) -> Placement:
         node_id = coerce_node_id(node)
         return self.node_placement[node_id]
-
-
-class PlacementConstraintError(Exception):
-    pass
-
-
-def check_placement(
-    shard: BlockOperation.Shard,
-    placement: Placement,
-) -> None:
-    raise PlacementConstraintError("TBD")
 
 
 def route_tensor_read(
@@ -142,7 +126,6 @@ class PlacementCostModel:
         layout: Layout,
     ):
         op_shard_placement = layout.get_placement(op_shard)
-        check_placement(shard=op_shard, placement=op_shard_placement)
 
         compute_time = self._op_shard_compute_time(
             op_shard=op_shard,
