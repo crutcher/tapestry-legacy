@@ -7,14 +7,15 @@ import torch
 
 from tapestry.expression_graph import (
     AggregateTensor,
-    PinnedTensor,
     TapestryEdge,
     TapestryGraph,
     TapestryNode,
     TapestryTag,
+    TensorShard,
     TensorValue,
 )
 from tapestry.testlib import eggs
+from tapestry.zspace import ZRange
 
 
 class DisjointAttributes(TapestryNode):
@@ -69,12 +70,12 @@ class TapestryGraphTest(unittest.TestCase):
         g = TapestryGraph()
 
         a_value = g.add_node(
-            PinnedTensor(
+            TensorShard(
                 node_id=uuid.uuid4(),
                 name="A",
                 shape=np.array([2, 3]),
                 dtype=torch.int64,
-                storage="pre:A",
+                slice=ZRange([2, 3]),
             ),
         )
 
@@ -119,7 +120,7 @@ class TapestryGraphTest(unittest.TestCase):
             g.list_nodes(),
             hamcrest.contains_exactly(
                 hamcrest.all_of(
-                    hamcrest.instance_of(PinnedTensor),
+                    hamcrest.instance_of(TensorShard),
                     hamcrest.has_property("name", "A"),
                 ),
                 hamcrest.all_of(
@@ -135,7 +136,7 @@ class TapestryGraphTest(unittest.TestCase):
             g.list_nodes(exclude=None),
             hamcrest.contains_exactly(
                 hamcrest.all_of(
-                    hamcrest.instance_of(PinnedTensor),
+                    hamcrest.instance_of(TensorShard),
                     hamcrest.has_property("name", "A"),
                     hamcrest.has_property("node_id", a_value.node_id),
                 ),
@@ -160,10 +161,10 @@ class TapestryGraphTest(unittest.TestCase):
         )
 
         eggs.assert_match(
-            g.list_nodes(PinnedTensor),
+            g.list_nodes(TensorShard),
             hamcrest.only_contains(
                 hamcrest.all_of(
-                    hamcrest.instance_of(PinnedTensor),
+                    hamcrest.instance_of(TensorShard),
                     hamcrest.has_property("name", "A"),
                 ),
             ),
@@ -172,12 +173,12 @@ class TapestryGraphTest(unittest.TestCase):
     def test_get_node(self) -> None:
         g = TapestryGraph()
 
-        adoc = PinnedTensor(
+        adoc = TensorShard(
             node_id=uuid.uuid4(),
             name="A",
             shape=np.array([2, 3]),
             dtype=torch.int64,
-            storage="pre:A",
+            slice=ZRange([2, 3]),
         )
         g.add_node(adoc)
 
@@ -193,7 +194,7 @@ class TapestryGraphTest(unittest.TestCase):
         eggs.assert_match(
             g.get_node(adoc.node_id),
             hamcrest.all_of(
-                hamcrest.instance_of(PinnedTensor),
+                hamcrest.instance_of(TensorShard),
                 hamcrest.has_property("name", "A"),
             ),
         )
@@ -202,15 +203,15 @@ class TapestryGraphTest(unittest.TestCase):
         eggs.assert_match(
             g.get_node(str(adoc.node_id)),
             hamcrest.all_of(
-                hamcrest.instance_of(PinnedTensor),
+                hamcrest.instance_of(TensorShard),
                 hamcrest.has_property("name", "A"),
             ),
         )
 
         eggs.assert_match(
-            g.get_node(adoc.node_id, PinnedTensor),
+            g.get_node(adoc.node_id, TensorShard),
             hamcrest.all_of(
-                hamcrest.instance_of(PinnedTensor),
+                hamcrest.instance_of(TensorShard),
                 hamcrest.has_property("name", "A"),
             ),
         )
@@ -226,12 +227,12 @@ class TapestryGraphTest(unittest.TestCase):
 
     def test_schema(self) -> None:
         g = TapestryGraph()
-        a = PinnedTensor(
+        a = TensorShard(
             node_id=uuid.uuid4(),
             name="A",
             shape=np.array([2, 3]),
             dtype=torch.int64,
-            storage="pre:A",
+            slice=ZRange([2, 3]),
         )
         g.add_node(a)
         eggs.assert_raises(
@@ -260,14 +261,14 @@ class TapestryGraphTest(unittest.TestCase):
             [
                 TapestryEdge,
                 TensorValue,
-                PinnedTensor,
+                TensorShard,
             ]
         )
 
         expected_json = {
             "nodes": {
                 str(a.node_id): {
-                    "__type__": "PinnedTensor",
+                    "__type__": "TensorShard",
                     **a.dump_json_data(),
                 },
                 str(b.node_id): {
@@ -297,12 +298,12 @@ class TapestryGraphTest(unittest.TestCase):
 
     def test_assert_node_types(self) -> None:
         g = TapestryGraph()
-        a = PinnedTensor(
+        a = TensorShard(
             node_id=uuid.uuid4(),
             name="A",
             shape=np.array([2, 3]),
             dtype=torch.int64,
-            storage="pre:A",
+            slice=ZRange([2, 3]),
         )
         g.add_node(a)
 
@@ -316,7 +317,7 @@ class TapestryGraphTest(unittest.TestCase):
 
         g.assert_node_types(
             [
-                PinnedTensor,
+                TensorShard,
                 TensorValue,
             ]
         )
@@ -328,7 +329,7 @@ class TapestryGraphTest(unittest.TestCase):
                 ],
             ),
             ValueError,
-            r"\[PinnedTensor, TensorValue\]",
+            r"\[TensorShard, TensorValue\]",
         )
 
     def test_edges(self) -> None:

@@ -35,7 +35,7 @@ import torch
 from tapestry import zspace
 from tapestry.numpy_utils import as_zarray
 from tapestry.serialization.json_serializable import JsonDumpable, JsonLoadable
-from tapestry.type_utils import UUIDConvertable, coerce_optional_uuid, coerce_uuid
+from tapestry.type_utils import UUIDConvertable, coerce_uuid
 from tapestry.zspace import ZRange, ZRangeMap
 
 NODE_TYPE_FIELD = "__type__"
@@ -591,7 +591,7 @@ class TapestryGraph(JsonDumpable):
     def list_tags(
         self,
         *,
-        source_id: UUIDConvertable = None,
+        source_id: Optional[NodeIdCoercible] = None,
         restrict: Optional[
             Union[Type[TapestryNode], Iterable[Type[TapestryNode]]]
         ] = None,
@@ -607,7 +607,7 @@ class TapestryGraph(JsonDumpable):
         self,
         tag_type: Type[_TapestryTagT],
         *,
-        source_id: UUIDConvertable = None,
+        source_id: Optional[NodeIdCoercible] = None,
         restrict: Optional[
             Union[Type[TapestryNode], Iterable[Type[TapestryNode]]]
         ] = None,
@@ -622,7 +622,7 @@ class TapestryGraph(JsonDumpable):
         self,
         tag_type: Type[TapestryTag | _TapestryTagT] = TapestryTag,
         *,
-        source_id: UUIDConvertable = None,
+        source_id: Optional[NodeIdCoercible] = None,
         restrict: Optional[
             Union[Type[TapestryNode], Iterable[Type[TapestryNode]]]
         ] = None,
@@ -647,7 +647,8 @@ class TapestryGraph(JsonDumpable):
         if not issubclass(tag_type, TapestryTag):
             raise AssertionError(f"Class {tag_type} is not a subclass of {TapestryTag}")
 
-        source_id = coerce_optional_uuid(source_id)
+        source_id = coerce_optional_node_id(source_id)
+
         return [
             node
             for node in self.list_nodes(
@@ -663,8 +664,8 @@ class TapestryGraph(JsonDumpable):
     def list_edges(
         self,
         *,
-        source_id: UUIDConvertable = None,
-        target_id: UUIDConvertable = None,
+        source_id: Optional[NodeIdCoercible] = None,
+        target_id: Optional[NodeIdCoercible] = None,
         restrict: Optional[
             Union[Type[TapestryNode], Iterable[Type[TapestryNode]]]
         ] = None,
@@ -680,8 +681,8 @@ class TapestryGraph(JsonDumpable):
         self,
         edge_type: Type[_TapestryEdgeT],
         *,
-        source_id: UUIDConvertable = None,
-        target_id: UUIDConvertable = None,
+        source_id: Optional[NodeIdCoercible] = None,
+        target_id: Optional[NodeIdCoercible] = None,
         restrict: Optional[
             Union[Type[TapestryNode], Iterable[Type[TapestryNode]]]
         ] = None,
@@ -696,8 +697,8 @@ class TapestryGraph(JsonDumpable):
         self,
         edge_type: Type[TapestryEdge | _TapestryEdgeT] = TapestryEdge,
         *,
-        source_id: UUIDConvertable = None,
-        target_id: UUIDConvertable = None,
+        source_id: Optional[NodeIdCoercible] = None,
+        target_id: Optional[NodeIdCoercible] = None,
         restrict: Optional[
             Union[Type[TapestryNode], Iterable[Type[TapestryNode]]]
         ] = None,
@@ -725,7 +726,7 @@ class TapestryGraph(JsonDumpable):
                 f"Class {edge_type} is not a subclass of {TapestryEdge}"
             )
 
-        target_id = coerce_optional_uuid(target_id)
+        target_id = coerce_optional_node_id(target_id)
 
         return [
             node
@@ -1067,15 +1068,6 @@ class AggregateTensor(TensorValue):
                 edge_type=AggregateTensor.Aggregates,
             )
         ]
-
-
-@marshmallow_dataclass.add_schema
-@dataclass(kw_only=True)
-class PinnedTensor(TensorValue):
-    class NodeControl(TapestryNode.NodeControl):
-        BG_COLOR = "#C39BD3"
-
-    storage: str
 
 
 @dataclass(kw_only=True)

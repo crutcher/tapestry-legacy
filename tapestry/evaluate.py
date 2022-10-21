@@ -7,7 +7,6 @@ import torch
 from tapestry.expression_graph import (
     AggregateTensor,
     BlockOperation,
-    PinnedTensor,
     ReadSlice,
     TensorShard,
     TensorValue,
@@ -57,9 +56,6 @@ def evaluate_tensor_value(
         raise ValueError(f"Cycle detected: {node.node_id} > {seen}")
 
     seen = [node.node_id] + (seen if seen else [])
-
-    if isinstance(node, PinnedTensor):
-        raise ValueError(f"PinnedTensor not bound in env: {node}")
 
     if isinstance(node, AggregateTensor):
         val = torch.zeros(tuple(node.shape), dtype=node.dtype)

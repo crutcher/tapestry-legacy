@@ -3,7 +3,6 @@ import numpy as np
 from tapestry.expression_graph import (
     AggregateTensor,
     BlockOperation,
-    PinnedTensor,
     ReadSlice,
     TapestryGraph,
     TensorValue,
@@ -80,7 +79,6 @@ def strip_orphan_values(g: TapestryGraph) -> None:
         for tensor_value in g.list_nodes(
             TensorValue,
             restrict=AggregateTensor,
-            exclude=PinnedTensor,
         ):
             node_id = tensor_value.node_id
             if node_id in g.observed:
