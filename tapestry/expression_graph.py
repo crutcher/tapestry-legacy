@@ -1038,6 +1038,18 @@ class TensorShard(TensorValue):
                 f"{self.node_type()} slice ({self.slice}) ∉ shape {self.shape}"
             )
 
+    def writer(self) -> Optional["BlockOperation.Shard"]:
+        es = self.assert_graph().list_edges(
+            edge_type=WriteSlice,
+            target_id=self,
+        )
+
+        if es:
+            assert len(es) == 1
+            return es[0].source(BlockOperation.Shard)
+
+        return None
+
 
 @marshmallow_dataclass.add_schema
 @dataclass(kw_only=True)
