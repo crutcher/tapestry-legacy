@@ -435,7 +435,7 @@ class TapestryGraph(JsonDumpable):
     def get_node(
         self,
         node_id: UUIDConvertable,
-        node_type: Type[TapestryNode] = TapestryNode,
+        node_type: Union[Type[TapestryNode], Type[_TapestryNodeT]] = TapestryNode,
     ) -> _TapestryNodeT:
         """
         Find a NodeAttributes by node_id, and wrap it in the given node type.
