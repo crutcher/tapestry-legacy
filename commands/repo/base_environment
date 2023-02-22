@@ -3,13 +3,15 @@
 # Exit on error.
 set -e
 
-PYTHON_VERSION=python3.10
+PYTHON=python3.10
 
 cd $WORKSPACE_ROOT_DIR
 
 rm -rf venv
 
-virtualenv -p $PYTHON_VERSION --prompt "(venv)" .venv
+$PYTHON -m venv --prompt "(venv)" .venv
 
 source .venv/bin/activate
+
+pip install --upgrade pip
 

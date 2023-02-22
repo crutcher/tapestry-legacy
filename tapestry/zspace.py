@@ -1,7 +1,7 @@
 import enum
 import functools
 import math
-from typing import Iterable, List, Set, Tuple
+from typing import Iterable, List, Optional, Set, Tuple
 
 from marshmallow import fields
 from marshmallow_dataclass import NewType, dataclass
@@ -371,7 +371,7 @@ class ZTransform(FrozenDoc):
         cls,
         input_dim: int,
         *,
-        out_dim: int = None,
+        out_dim: Optional[int] = None,
         offset=None,
     ) -> "ZTransform":
         """

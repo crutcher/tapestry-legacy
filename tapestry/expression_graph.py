@@ -744,8 +744,8 @@ class TapestryGraph(JsonDumpable):
         self,
         edge_type: Type[_TapestryEdgeT],
         *,
-        source_id: UUIDConvertable = None,
-        target_id: UUIDConvertable = None,
+        source_id: Optional[UUIDConvertable] = None,
+        target_id: Optional[UUIDConvertable] = None,
     ) -> _TapestryEdgeT:
         edges = self.list_edges(
             edge_type=edge_type,

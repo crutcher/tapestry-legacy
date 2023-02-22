@@ -13,7 +13,7 @@ def ndarray_aggregate_equality(a, b):
     b = np.asarray(b)
     try:
         return np.equal(a, b).all()
-    except np.ValueError:
+    except ValueError:
         return False
 
 
