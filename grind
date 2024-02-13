@@ -48,7 +48,7 @@ function group_help() {
       cat README.md
     fi
 
-    local cmds=( $(find -mindepth 1 -maxdepth 1 -type f -executable | sort | sed 's/^\.\///') )
+    local cmds=( $(find . -mindepth 1 -maxdepth 1 -type f | (while read f; do if [ -x "$f" ]; then echo "$f"; fi; done) | sort | sed 's/^\.\///') )
     if (( ${#cmds[@]} )); then
       echo "# Commands:"
       for cmd in "${cmds[@]}"; do
@@ -73,7 +73,7 @@ function group_help() {
       done
     fi
 
-    local groups=( $(find -mindepth 1 -maxdepth 1 -type d | sort | sed 's/^\.\///') )
+    local groups=( $(find . -mindepth 1 -maxdepth 1 -type d | sort | sed 's/^\.\///') )
     if (( ${#groups[@]} )); then
       echo "# Sub-Groups:"
       for g in ${groups[@]}; do
